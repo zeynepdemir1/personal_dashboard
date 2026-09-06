@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,400;0,500;0,600;1,6..72,300;1,400&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #FBF1F0; }
+  * { box-sizing: border-box; }
+  a { color: #DB7F8E; text-decoration: none; border-bottom: 1px solid rgba(219,127,142,0.35); }
+  a:hover { color: #C96876; border-bottom-color: rgba(201,104,118,0.6); }
+  ::selection { background: #FFDBDA; }
+  input::placeholder { color: #B79CA0; }
+</style>
+</helmet>
+<div style="display: flex; align-items: stretch; min-height: 100vh; background: #FBF1F0; color: #3D2B2E; font-family: 'IBM Plex Sans', Helvetica, sans-serif; -webkit-font-smoothing: antialiased;">
+
+  <div onClick="{{ toggleSidebar }}" style="{{ sidebarToggleStyle }}">{{ sidebarToggleIcon }}</div>
+
+  <aside style="{{ sidebarStyle }}">
+    <nav style="display: flex; flex-direction: column; gap: 2px;">
+      <div onClick="{{ goHome }}" style="{{ homeItemStyle }}" style-hover="background: #F7E4E3;">Ana Sayfa</div>
+      <div style="margin-top: 20px; font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #8C6B70; padding: 0 10px 6px;">Akademik</div>
+      <sc-for list="{{ academicNav }}" as="item" hint-placeholder-count="6">
+        <div onClick="{{ item.go }}" style="{{ item.style }}" style-hover="background: #F7E4E3;">
+          <span>{{ item.label }}</span>
+          <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; color: #A9767D;">{{ item.count }}</span>
+        </div>
+      </sc-for>
+      <div style="margin-top: 20px; font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #8C6B70; padding: 0 10px 6px;">Kişisel</div>
+      <sc-for list="{{ personalNav }}" as="item" hint-placeholder-count="2">
+        <div onClick="{{ item.go }}" style="{{ item.style }}" style-hover="background: #F7E4E3;">
+          <span>{{ item.label }}</span>
+          <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; color: #A9767D;">{{ item.count }}</span>
+        </div>
+      </sc-for>
+    </nav>
+
+    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 22px; border-top: 1px solid #E8D3D3;">
+      <div onClick="{{ toggleProfile }}" style="display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 6px 8px; margin: 0 -8px; border-radius: 6px;" style-hover="background: #F7E4E3;">
+        <div style="width: 38px; height: 38px; border-radius: 50%; background: #604D53; color: #FFDBDA; display: flex; align-items: center; justify-content: center; font-family: 'Newsreader', Georgia, serif; font-size: 15px; flex: 0 0 38px;">DA</div>
+        <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
+          <div style="font-family: 'Newsreader', Georgia, serif; font-size: 15.5px; line-height: 1.2;">Deniz Arslan</div>
+          <div style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; letter-spacing: 0.04em; color: #8C6B70;">Elektrik–Elektronik · 3. sınıf</div>
+        </div>
+        <span style="margin-left: auto; font-size: 13px; color: #8C6B70;">⋯</span>
+      </div>
+      <sc-if value="{{ profileOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 6px; padding: 4px 8px 2px; font-size: 12.5px; color: #604D53;">
+          <span style="cursor: pointer;" style-hover="color: #DB7F8E;">Profili düzenle</span>
+          <span style="cursor: pointer;" style-hover="color: #DB7F8E;">Hesap ekle</span>
+        </div>
+      </sc-if>
+      
+    </div>
+  </aside>
+
+  <main style="{{ mainPad }}">
+
+    <sc-if value="{{ showBreadcrumb }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 28px; font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 12.5px; color: #604D53; flex-wrap: wrap;">
+        <span onClick="{{ goBack }}" style="cursor: pointer; color: #604D53; font-weight: 500; padding: 7px 14px; border: 1px solid #D5C5C8; border-radius: 4px; background: #FFFBFA;" style-hover="background: #F7E4E3; color: #DB7F8E;">← Geri</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; flex-direction: column; gap: 48px;">
+        <header style="display: flex; flex-direction: column; gap: 14px;">
+          <div style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #A9767D;">31 Ağustos 2026 · Pazartesi</div>
+          <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 46px; line-height: 1.1; font-weight: 400; letter-spacing: -0.02em; max-width: 20ch; color: #3D2B2E;">İyi akşamlar, Deniz.</h1>
+          <p style="margin: 0; max-width: 54ch; font-size: 15px; line-height: 1.65; color: #604D53; text-wrap: pretty;">Ağustos ayında <em style="font-family: 'Newsreader', Georgia, serif; font-style: italic; color: #3D2B2E;">14 gelişim notu</em> yazdın, 6 araştırma konusunu kapattın ve iki yeni proje fikri biriktirdin. Son yazın dört gün önceydi.</p>
+        </header>
+
+        <section style="{{ gridStats }}">
+          <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+            <div style="padding: 20px 20px 18px; display: flex; flex-direction: column; gap: 6px; background-color: #FDEEEE">
+              <div style="font-family: 'Newsreader', Georgia, serif; font-size: 32px; line-height: 1; font-weight: 400; color: #3D2B2E;">{{ s.value }}</div>
+              <div style="font-size: 12.5px; font-weight: 500; color: #604D53; line-height: 1.4;">{{ s.label }}</div>
+              <div style="font-size: 11px; color: #8C6B70; line-height: 1.45;">{{ s.sub }}</div>
+            </div>
+          </sc-for>
+        </section>
+
+        <section style="{{ gridHome }}">
+          <div style="display: flex; flex-direction: column; gap: 20px;">
+            <div style="display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid #E8D3D3; padding-bottom: 10px;">
+              <h2 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 19px; font-weight: 500; color: #3D2B2E;">Son girişler</h2>
+              <span onClick="{{ goLearn }}" style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; color: #DB7F8E; cursor: pointer; letter-spacing: 0.04em; border-bottom: 1px solid transparent; padding-bottom: 1px;" style-hover="border-bottom-color: #DB7F8E;">tümü →</span>
+            </div>
+            <sc-for list="{{ recent }}" as="r" hint-placeholder-count="4">
+              <div onClick="{{ r.open }}" style="display: flex; flex-direction: column; gap: 7px; padding: 14px 14px 15px; margin: 0 -14px; cursor: pointer; border-radius: 3px;" style-hover="background: #F7E4E3;">
+                <div style="display: flex; align-items: baseline; gap: 12px;">
+                  <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; color: #A9767D; flex: 0 0 60px;">{{ r.date }}</span>
+                  <span style="font-family: 'Newsreader', Georgia, serif; font-size: 18px; line-height: 1.3; color: #3D2B2E;">{{ r.title }}</span>
+                </div>
+                <div style="padding-left: 72px; font-size: 13px; line-height: 1.6; color: #604D53; text-wrap: pretty;">{{ r.summary }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid #E8D3D3; padding-bottom: 10px;">
+              <h2 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 19px; font-weight: 500; color: #3D2B2E;">Yaklaşan programlar</h2>
+              <span onClick="{{ addProgram }}" style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; color: #DB7F8E; cursor: pointer; letter-spacing: 0.04em; border-bottom: 1px solid transparent; padding-bottom: 1px;" style-hover="border-bottom-color: #DB7F8E;">+ Program ekle</span>
+            </div>
+            <sc-for list="{{ upcoming }}" as="u" hint-placeholder-count="3">
+              <div style="display: flex; gap: 14px; align-items: flex-start;">
+                <div style="flex: 0 0 46px; text-align: center; border: 1px solid #E8D3D3; padding: 6px 0 7px; background: #FFFBFA;">
+                  <div style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: #A9767D;">{{ u.month }}</div>
+                  <div style="font-family: 'Newsreader', Georgia, serif; font-size: 20px; line-height: 1.1; color: #3D2B2E;">{{ u.day }}</div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 3px; padding-top: 2px;">
+                  <div style="font-size: 14px; font-weight: 500; color: #3D2B2E;">{{ u.title }}</div>
+                  <div style="font-size: 12px; color: #604D53; line-height: 1.5;">{{ u.note }}</div>
+                  <div style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; color: {{ u.color }}; letter-spacing: 0.06em;">{{ u.left }}</div>
+                </div>
+              </div>
+            </sc-for>
+
+            <sc-if value="{{ addingProgram }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; gap: 8px; padding-top: 6px;">
+                <input value="{{ qProgram }}" onChange="{{ onQProgram }}" placeholder="Program adı ve tarih…" style="flex: 1; padding: 9px 11px; border: 1px solid #D5C5C8; background: #FFFBFA; font-size: 13px; color: #3D2B2E; outline: none; border-radius: 3px;">
+                <div onClick="{{ saveProgram }}" style="padding: 9px 14px; background: #604D53; color: #FFDBDA; font-size: 12.5px; cursor: pointer; border-radius: 3px; white-space: nowrap;" style-hover="background: #4A3B3E;">Ekle</div>
+              </div>
+            </sc-if>
+
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding-top: 16px; border-top: 1px dashed #D5C5C8;">
+              <div style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #8C6B70;">Önerilen programlar</div>
+              <div style="font-size: 12.5px; line-height: 1.6; color: #8C6B70; font-style: italic;">İçeriğine göre AI önerileri burada listelenecek — henüz hazır değil.</div>
+            </div>
+          </div>
+        </section>
+
+        <section style="{{ gridThree }}">
+          <div style="display: flex; flex-direction: column; gap: 14px; border: 1px solid #E8D3D3; background: #FFFBFA; padding: 20px 20px 18px; border-radius: 4px;">
+            <h2 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 17px; font-weight: 500; color: #3D2B2E;">Linkler</h2>
+            <sc-for list="{{ homeLinks }}" as="l" hint-placeholder-count="3">
+              <div onClick="{{ l.open }}" style="display: flex; flex-direction: column; gap: 2px; cursor: pointer; padding: 6px 8px; margin: 0 -8px; border-radius: 3px;" style-hover="background: #F7E4E3;">
+                <span style="font-size: 13px; color: #3D2B2E; line-height: 1.35;">{{ l.title }}</span>
+                <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; color: #A9767D;">{{ l.kind }}</span>
+              </div>
+            </sc-for>
+            <div style="display: flex; gap: 6px; margin-top: 4px;">
+              <input value="{{ qLink }}" onChange="{{ onQLink }}" placeholder="Link yapıştır…" style="flex: 1; padding: 8px 10px; border: 1px solid #D5C5C8; background: #FFFFFF; font-size: 12.5px; color: #3D2B2E; outline: none; border-radius: 3px;">
+              <div onClick="{{ addLink }}" style="padding: 8px 12px; background: #604D53; color: #FFDBDA; font-size: 12px; cursor: pointer; border-radius: 3px;" style-hover="background: #4A3B3E;">Ekle</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 14px; border: 1px solid #E8D3D3; background: #FFFBFA; padding: 20px 20px 18px; border-radius: 4px;">
+            <h2 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 17px; font-weight: 500; color: #3D2B2E;">Merak konuları</h2>
+            <sc-for list="{{ openTopics }}" as="t" hint-placeholder-count="3">
+              <div onClick="{{ t.toggle }}" style="display: flex; gap: 10px; align-items: baseline; font-size: 13.5px; color: #3D2B2E; cursor: pointer; padding: 3px 6px; margin: 0 -6px; border-radius: 3px;" style-hover="background: #F7E4E3;">
+                <span style="width: 14px; height: 14px; border: 1px solid #B79CA0; border-radius: 3px; flex: 0 0 14px; margin-top: 3px;"></span>
+                <span style="line-height: 1.5;">{{ t.title }}</span>
+              </div>
+            </sc-for>
+            <div style="display: flex; gap: 6px; margin-top: 4px;">
+              <input value="{{ qTopic }}" onChange="{{ onQTopic }}" placeholder="Yeni merak konusu…" style="flex: 1; padding: 8px 10px; border: 1px solid #D5C5C8; background: #FFFFFF; font-size: 12.5px; color: #3D2B2E; outline: none; border-radius: 3px;">
+              <div onClick="{{ imgBtnIcon }}" style="width: 32px; flex: 0 0 32px; display: flex; align-items: center; justify-content: center; border: 1px solid #D5C5C8; border-radius: 3px; cursor: pointer; color: #604D53;" style-hover="background: #F7E4E3;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="9" cy="10" r="1.6"></circle><path d="M21 16l-5-5-4 4-3-3-5 5"></path></svg>
+              </div>
+              <div onClick="{{ addTopic }}" style="padding: 8px 12px; background: #604D53; color: #FFDBDA; font-size: 12px; cursor: pointer; border-radius: 3px;" style-hover="background: #4A3B3E;">Ekle</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 14px; border: 1px solid #E8D3D3; background: #FFFBFA; padding: 20px 20px 18px; border-radius: 4px;">
+            <h2 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 17px; font-weight: 500; color: #3D2B2E;">Proje fikirleri</h2>
+            <sc-for list="{{ homeProjects }}" as="p" hint-placeholder-count="3">
+              <div style="display: flex; flex-direction: column; gap: 2px; padding: 3px 0;">
+                <span style="font-size: 13px; color: #3D2B2E; line-height: 1.4;">{{ p.title }}</span>
+                <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; color: {{ p.stateColor }};">{{ p.state }}</span>
+              </div>
+            </sc-for>
+            <div style="display: flex; gap: 6px; margin-top: 4px;">
+              <input value="{{ qProject }}" onChange="{{ onQProject }}" placeholder="Yeni proje fikri…" style="flex: 1; padding: 8px 10px; border: 1px solid #D5C5C8; background: #FFFFFF; font-size: 12.5px; color: #3D2B2E; outline: none; border-radius: 3px;">
+              <div style="width: 32px; flex: 0 0 32px; display: flex; align-items: center; justify-content: center; border: 1px solid #D5C5C8; border-radius: 3px; cursor: pointer; color: #604D53;" style-hover="background: #F7E4E3;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="9" cy="10" r="1.6"></circle><path d="M21 16l-5-5-4 4-3-3-5 5"></path></svg>
+              </div>
+              <div onClick="{{ addProject }}" style="padding: 8px 12px; background: #604D53; color: #FFDBDA; font-size: 12px; cursor: pointer; border-radius: 3px;" style-hover="background: #4A3B3E;">Ekle</div>
+            </div>
+          </div>
+        </section>
+
+        <section style="display: flex; flex-direction: column; gap: 16px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid #E8D3D3; padding-bottom: 10px; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              <h2 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 19px; font-weight: 500; color: #3D2B2E;">{{ calTitle }}</h2>
+              <div style="display: flex; gap: 6px;">
+                <div style="{{ weekToggleStyle }}" onClick="{{ setWeekView }}">Haftalık</div>
+                <div style="{{ monthToggleStyle }}" onClick="{{ setMonthView }}">Aylık</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 14px;">
+              <span style="display: flex; align-items: center; gap: 6px; font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10.5px; color: #8C6B70;">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: #9DA3A4;"></span> Google Calendar ile senkronize
+              </span>
+              <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; color: #DB7F8E; cursor: pointer; border-bottom: 1px solid transparent; padding-bottom: 1px;" style-hover="border-bottom-color: #DB7F8E;">+ Not / ders ekle</span>
+            </div>
+          </div>
+
+          <sc-if value="{{ isWeekView }}" hint-placeholder-val="{{ true }}">
+            <div style="display: grid; grid-template-columns: 58px 1fr; gap: 0; border: 1px solid #E8D3D3; background: #FFFBFA; border-radius: 4px; overflow: hidden; transition: opacity 0.15s ease;">
+              <div></div>
+              <div style="display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 1px solid #E8D3D3;">
+                <sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="7">
+                  <div style="padding: 16px 8px; text-align: center; border-left: 1px solid #EEDFDF;">
+                    <div style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10.5px; letter-spacing: 0.08em; color: #8C6B70;">{{ d.label }}</div>
+                    <div style="font-family: 'Newsreader', Georgia, serif; font-size: 17px; color: #3D2B2E; margin-top: 2px;">{{ d.date }}</div>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="display: flex; flex-direction: column;">
+                <sc-for list="{{ hourLabels }}" as="h" hint-placeholder-count="12">
+                  <div style="height: 56px; font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10.5px; color: #A9767D; text-align: right; padding-right: 8px; transform: translateY(-7px);">{{ h }}</div>
+                </sc-for>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(7, 1fr); position: relative; background-image: repeating-linear-gradient(to bottom, #EEDFDF 0, #EEDFDF 1px, transparent 1px, transparent 56px); height: 672px;">
+                <sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="7">
+                  <div style="position: relative; border-left: 1px solid #EEDFDF;">
+                    <sc-for list="{{ d.blocks }}" as="b" hint-placeholder-count="1">
+                      <div style="{{ b.style }}">{{ b.label }}</div>
+                    </sc-for>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isMonthView }}" hint-placeholder-val="{{ false }}">
+            <div style="border: 1px solid #E8D3D3; background: #FFFBFA; border-radius: 4px; overflow: hidden; transition: opacity 0.15s ease;">
+              <div style="display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 1px solid #E8D3D3;">
+                <sc-for list="{{ weekDayLabels }}" as="d" hint-placeholder-count="7">
+                  <div style="padding: 9px 6px; text-align: center; font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10.5px; letter-spacing: 0.06em; color: #8C6B70;">{{ d }}</div>
+                </sc-for>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(7, 1fr);">
+                <sc-for list="{{ monthCells }}" as="c" hint-placeholder-count="42">
+                  <div onClick="{{ c.open }}" style="{{ c.style }}" style-hover="{{ c.hoverStyle }}">
+                    <sc-if value="{{ c.day }}" hint-placeholder-val="{{ false }}">
+                      <span style="{{ c.dayStyle }}">{{ c.day }}</span>
+                      <div style="display: flex; gap: 4px; margin-top: 8px;">
+                        <sc-for list="{{ c.dots }}" as="dot" hint-placeholder-count="0">
+                          <span style="width: 5px; height: 5px; border-radius: 50%; background: #DB7F8E;"></span>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </section>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isGrowth }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 46px;">
+        <header>
+          <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 40px; font-weight: 400; letter-spacing: -0.02em; color: #3D2B2E;">Akademik Gelişim</h1>
+        </header>
+
+        <div style="display: flex; gap: 10px; align-items: center; border-top: 1px solid #E8D3D3; border-bottom: 1px solid #E8D3D3; padding: 12px 0;">
+          <sc-for list="{{ growthFilters }}" as="f" hint-placeholder-count="5">
+            <div style="{{ f.style }}" style-hover="background: #F7E4E3;">{{ f.label }}</div>
+          </sc-for>
+          <div style="margin-left: auto; font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; color: #604D53;">42 not · 9 ay</div>
+        </div>
+
+        <sc-for list="{{ months }}" as="m" hint-placeholder-count="3">
+          <section style="{{ gridGrowth }}">
+            <div style="position: sticky; top: 40px; border: 1px solid #E8D3D3; background: #FFFBFA; padding: 22px 22px 24px; display: flex; flex-direction: column; gap: 16px;">
+              <div style="display: flex; align-items: baseline; justify-content: space-between;">
+                <div style="font-family: 'Newsreader', Georgia, serif; font-size: 24px; font-weight: 500; color: #3D2B2E;">{{ m.name }}</div>
+                <div style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #A9767D;">{{ m.count }} not</div>
+              </div>
+              <div style="display: flex; gap: 3px; align-items: flex-end; height: 34px;">
+                <sc-for list="{{ m.bars }}" as="b" hint-placeholder-count="12">
+                  <div style="{{ b.style }}"></div>
+                </sc-for>
+              </div>
+              <p style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 15.5px; line-height: 1.62; color: #3D2B2E; text-wrap: pretty;">{{ m.summary }}</p>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                <sc-for list="{{ m.tags }}" as="t" hint-placeholder-count="3">
+                  <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; letter-spacing: 0.04em; padding: 4px 8px; background: #FFDBDA; color: #8C4650; border-radius: 2px;">{{ t }}</span>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; border-left: 1px solid #E8D3D3; padding-left: 0;">
+              <sc-for list="{{ m.notes }}" as="n" hint-placeholder-count="4">
+                <div onClick="{{ n.open }}" style="display: flex; gap: 20px; padding: 18px 0 20px 26px; border-bottom: 1px solid #F1E4E4; position: relative; cursor: {{ n.cursor }};" style-hover="background: #FCF3F2;">
+                  <span style="position: absolute; left: -4px; top: 26px; width: 7px; height: 7px; border-radius: 50%; background: {{ n.dot }};"></span>
+                  <div style="flex: 0 0 74px; font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; color: #A9767D; padding-top: 3px;">{{ n.date }}</div>
+                  <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;">
+                    <div style="font-family: 'Newsreader', Georgia, serif; font-size: 18.5px; line-height: 1.35; color: #3D2B2E;">{{ n.title }}</div>
+                    <div style="font-size: 13.5px; line-height: 1.65; color: #604D53; text-wrap: pretty;">{{ n.body }}</div>
+                    <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #A9767D;">{{ n.source }}</span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isLearn }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 44px;">
+        <header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 40px;">
+          <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 40px; font-weight: 400; letter-spacing: -0.02em; color: #3D2B2E;">Bir Şey Öğrendim</h1>
+          <div style="padding: 11px 18px; background: #604D53; color: #FFDBDA; font-size: 13px; cursor: pointer; white-space: nowrap; border-radius: 3px;" style-hover="background: #4A3B3E;">Yeni giriş</div>
+        </header>
+
+        <div style="{{ gridLearn }}">
+          <div style="display: flex; flex-direction: column; border-top: 1px solid #E8D3D3;">
+            <sc-for list="{{ entries }}" as="e" hint-placeholder-count="6">
+              <div onClick="{{ e.open }}" style="{{ e.style }}">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px;">
+                  <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10.5px; color: #A9767D;">{{ e.date }}</span>
+                  <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; color: #8C6B70;">{{ e.len }}</span>
+                </div>
+                <div style="font-family: 'Newsreader', Georgia, serif; font-size: 17px; line-height: 1.35; color: #3D2B2E;">{{ e.title }}</div>
+                <div style="font-size: 12.5px; line-height: 1.55; color: #604D53;">{{ e.teaser }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <article style="{{ articleStyle }}">
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #A9767D;">{{ article.stamp }}</div>
+              <h2 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; line-height: 1.2; letter-spacing: -0.015em; max-width: 26ch; color: #3D2B2E;">{{ article.title }}</h2>
+            </div>
+
+            <div style="border-left: 2px solid #DB7F8E; padding: 2px 0 2px 18px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #A9464E;">Yerel model özeti</div>
+              <p style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 16.5px; line-height: 1.6; color: #3D2B2E; text-wrap: pretty;">{{ article.summary }}</p>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 18px; max-width: 68ch;">
+              <sc-for list="{{ article.body }}" as="p" hint-placeholder-count="4">
+                <p style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 17.5px; line-height: 1.72; color: #3D2B2E; text-wrap: pretty;">{{ p }}</p>
+              </sc-for>
+              <div style="border: 1px solid #D5C5C8; background: #FCF3F2; padding: 18px 20px; font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 12.5px; line-height: 1.7; color: #4A3B3E; white-space: pre-wrap;">{{ article.code }}</div>
+              <sc-for list="{{ article.body2 }}" as="p" hint-placeholder-count="2">
+                <p style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 17.5px; line-height: 1.72; color: #3D2B2E; text-wrap: pretty;">{{ p }}</p>
+              </sc-for>
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid #F1E4E4; padding-top: 20px; align-items: center;">
+              <sc-for list="{{ article.tags }}" as="t" hint-placeholder-count="3">
+                <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; letter-spacing: 0.04em; padding: 5px 9px; background: #FFDBDA; color: #8C4650;">{{ t }}</span>
+              </sc-for>
+              <span onClick="{{ goGrowth }}" style="margin-left: auto; font-size: 12px; color: #DB7F8E; cursor: pointer; padding: 6px 12px; border: 1px solid #F0BFC0; border-radius: 4px;" style-hover="background: #FFDBDA;">{{ article.rel }} →</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isLinks }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 40px;">
+        <header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 40px;">
+          <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 40px; font-weight: 400; letter-spacing: -0.02em; color: #3D2B2E;">Linkler</h1>
+          <div style="padding: 11px 18px; border: 1px solid #604D53; color: #604D53; font-size: 13px; cursor: pointer; white-space: nowrap; border-radius: 3px;" style-hover="background: #604D53; color: #FFDBDA;">Link yapıştır</div>
+        </header>
+
+        <div style="display: flex; gap: 8px; align-items: center; border-top: 1px solid #E8D3D3; border-bottom: 1px solid #E8D3D3; padding: 12px 0; flex-wrap: wrap;">
+          <sc-for list="{{ linkFilters }}" as="f" hint-placeholder-count="6">
+            <div style="{{ f.style }}" style-hover="background: #F7E4E3;">{{ f.label }}</div>
+          </sc-for>
+        </div>
+
+        <div style="{{ gridLinks }}">
+          <sc-for list="{{ links }}" as="l" hint-placeholder-count="8">
+            <div onClick="{{ l.open }}" style="background: #FFFBFA; padding: 24px 24px 22px; display: flex; flex-direction: column; gap: 11px; cursor: pointer;" style-hover="background: #FCF3F2;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: {{ l.kindColor }};">{{ l.kind }}</span>
+                <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; color: #8C6B70;">{{ l.date }}</span>
+              </div>
+              <div style="font-family: 'Newsreader', Georgia, serif; font-size: 20px; line-height: 1.3; color: #3D2B2E;">{{ l.title }}</div>
+              <div style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; color: #8C6B70; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ l.url }}</div>
+              <p style="margin: 0; font-size: 13.5px; line-height: 1.6; color: #604D53; text-wrap: pretty;">{{ l.note }}</p>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px;">
+                <sc-for list="{{ l.tags }}" as="t" hint-placeholder-count="2">
+                  <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; padding: 3px 7px; border: 1px solid #D5C5C8; color: #604D53;">{{ t }}</span>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isDiaryLocked }}" hint-placeholder-val="{{ false }}">
+      <div style="min-height: 74vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; text-align: center;">
+        <div style="width: 34px; height: 34px; border: 1px solid #D5C5C8; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <span style="width: 7px; height: 7px; background: #604D53; border-radius: 50%;"></span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px; max-width: 34ch;">
+          <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 34px; font-weight: 400; letter-spacing: -0.015em; color: #3D2B2E;">Günlük kilitli</h1>
+          <p style="margin: 0; font-size: 14px; line-height: 1.65; color: #604D53;">Bu bölüm sadece senin. Şifre cihazdan çıkmıyor, girişler yerelde şifreli tutuluyor.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px; align-items: center;">
+          <input type="password" value="{{ pass }}" onChange="{{ onPass }}" placeholder="••••••••" style="width: 260px; padding: 13px 16px; border: 1px solid #D5C5C8; background: #FFFBFA; font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 14px; letter-spacing: 0.2em; text-align: center; outline: none; color: #3D2B2E;">
+          <div onClick="{{ unlock }}" style="width: 260px; padding: 12px 0; background: #604D53; color: #FFDBDA; font-size: 13px; text-align: center; cursor: pointer; border-radius: 3px;" style-hover="background: #4A3B3E;">Aç</div>
+          <div style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10.5px; color: #8C6B70; letter-spacing: 0.06em;">son giriş · 27 Ağustos, 23:41</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isDiaryOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 34px; max-width: 68ch;">
+        <header style="display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid #E8D3D3; padding-bottom: 14px;">
+          <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 34px; font-weight: 400; color: #3D2B2E;">Günlük</h1>
+          <span onClick="{{ lock }}" style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; color: #DB7F8E; cursor: pointer; border-bottom: 1px solid transparent; padding-bottom: 1px;" style-hover="border-bottom-color: #DB7F8E;">kilitle</span>
+        </header>
+        <sc-for list="{{ diary }}" as="d" hint-placeholder-count="3">
+          <div style="display: flex; flex-direction: column; gap: 8px; padding-bottom: 26px; border-bottom: 1px solid #F1E4E4;">
+            <div style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #A9767D;">{{ d.date }}</div>
+            <p style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 17.5px; line-height: 1.72; text-wrap: pretty; color: #3D2B2E;">{{ d.text }}</p>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isProjects }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 34px;">
+        <header>
+          <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 40px; font-weight: 400; letter-spacing: -0.02em; color: #3D2B2E;">Yapılacak Projeler</h1>
+        </header>
+        <div style="display: flex; flex-direction: column; border-top: 1px solid #E8D3D3;">
+          <sc-for list="{{ projects }}" as="p" hint-placeholder-count="5">
+            <div style="{{ listGrid }}" style-hover="background: #FCF3F2;">
+              <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: {{ p.stateColor }};">{{ p.state }}</span>
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <span style="font-family: 'Newsreader', Georgia, serif; font-size: 19px; color: #3D2B2E;">{{ p.title }}</span>
+                <span style="font-size: 13px; line-height: 1.6; color: #604D53;">{{ p.note }}</span>
+              </div>
+              <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; color: #8C6B70; text-align: right;">{{ p.date }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isCalendar }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 34px;">
+        <header>
+          <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 40px; font-weight: 400; letter-spacing: -0.02em; color: #3D2B2E;">Program Takvimi</h1>
+        </header>
+        <div style="display: flex; flex-direction: column; border-top: 1px solid #E8D3D3;">
+          <sc-for list="{{ programs }}" as="p" hint-placeholder-count="5">
+            <div style="{{ listGrid }}" style-hover="background: #FCF3F2;">
+              <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11.5px; color: #3D2B2E;">{{ p.date }}</span>
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <span style="font-family: 'Newsreader', Georgia, serif; font-size: 19px; color: #3D2B2E;">{{ p.title }}</span>
+                <span style="font-size: 13px; line-height: 1.6; color: #604D53;">{{ p.note }}</span>
+              </div>
+              <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: {{ p.color }}; text-align: right;">{{ p.remind }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isPoems }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 40px; max-width: 62ch;">
+        <header>
+          <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 40px; font-weight: 400; letter-spacing: -0.02em; color: #3D2B2E;">Şiir</h1>
+        </header>
+        <sc-for list="{{ poems }}" as="p" hint-placeholder-count="3">
+          <div style="display: flex; flex-direction: column; gap: 12px; padding-bottom: 34px; border-bottom: 1px solid #F1E4E4;">
+            <div style="font-family: 'Newsreader', Georgia, serif; font-style: italic; font-size: 20px; color: #3D2B2E;">{{ p.title }}</div>
+            <p style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 17px; line-height: 1.9; color: #3D2B2E; white-space: pre-line;">{{ p.text }}</p>
+            <div style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 10.5px; color: #A9767D; letter-spacing: 0.08em;">{{ p.date }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isTopics }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 34px;">
+        <header>
+          <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 40px; font-weight: 400; letter-spacing: -0.02em; color: #3D2B2E;">Araştırılacak Konular</h1>
+        </header>
+        <div style="{{ gridTopicHead }}">
+          <span>Konu</span><span>Not tarihi</span><span>Kapanış</span><span style="text-align: right;">Bağlantı</span>
+        </div>
+        <div style="display: flex; flex-direction: column;">
+          <sc-for list="{{ topics }}" as="t" hint-placeholder-count="7">
+            <div style="{{ gridTopicRow }}" style-hover="background: #FCF3F2;">
+              <div onClick="{{ t.toggle }}" style="display: flex; gap: 12px; align-items: center; min-width: 0; cursor: pointer; {{ rowMain }}">
+                <span style="{{ t.box }}">{{ t.mark }}</span>
+                <span style="{{ t.textStyle }}">{{ t.title }}</span>
+              </div>
+              <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; color: #604D53;">{{ t.added }}</span>
+              <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; color: {{ t.doneColor }};">{{ t.done }}</span>
+              <span onClick="{{ goLearn }}" style="{{ t.linkStyle }}">{{ t.link }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+  </main>
+
+  <sc-if value="{{ dayPanelOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeDayPanel }}" style="position: fixed; inset: 0; background: rgba(61,43,46,0.28); z-index: 55;"></div>
+    <div style="position: fixed; top: 0; right: 0; height: 100vh; width: 360px; background: #FFFBFA; box-shadow: -10px 0 32px rgba(61,43,46,0.18); z-index: 56; padding: 30px 26px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto;">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="font-family: 'Newsreader', Georgia, serif; font-size: 22px; color: #3D2B2E;">{{ dayPanelTitle }}</div>
+        <span onClick="{{ closeDayPanel }}" style="cursor: pointer; color: #8C6B70; font-size: 16px; padding: 4px;" style-hover="color: #DB7F8E;">✕</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <sc-for list="{{ dayPanelItems }}" as="it" hint-placeholder-count="3">
+          <div style="display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid #E8D3D3; border-radius: 4px; background: #FCF3F2;">
+            <span style="font-family: 'IBM Plex Sans', Helvetica, sans-serif; font-size: 11px; color: #A9767D; flex: 0 0 40px;">{{ it.time }}</span>
+            <span style="font-size: 13.5px; color: #3D2B2E; line-height: 1.4; flex: 1;">{{ it.label }}</span>
+            <span onClick="{{ it.remove }}" style="cursor: pointer; color: #B79CA0; padding: 4px; flex: 0 0 auto;" style-hover="color: #C0554F;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg>
+            </span>
+          </div>
+        </sc-for>
+        <sc-if value="{{ dayPanelEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size: 13px; color: #8C6B70; font-style: italic;">Bu güne henüz bir şey eklenmedi.</div>
+        </sc-if>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: auto; border-top: 1px solid #E8D3D3; padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <input type="time" value="{{ dayPanelTime }}" onChange="{{ onDayPanelTime }}" style="padding: 8px 10px; border: 1px solid #D5C5C8; border-radius: 4px; font-size: 12.5px; color: #3D2B2E; font-family: 'IBM Plex Sans', Helvetica, sans-serif; outline: none; width: 112px;">
+          <span style="font-size: 10.5px; color: #8C6B70; line-height: 1.4;">saat girilmezse not olarak eklenir</span>
+        </div>
+        <textarea value="{{ dayPanelInput }}" onChange="{{ onDayPanelInput }}" placeholder="Not, yapılacak veya ders ekle…" style="resize: vertical; min-height: 70px; padding: 10px 12px; border: 1px solid #D5C5C8; border-radius: 4px; font-size: 13px; color: #3D2B2E; font-family: 'IBM Plex Sans', Helvetica, sans-serif; outline: none;"></textarea>
+        <div onClick="{{ addDayPanelItem }}" style="padding: 10px 0; text-align: center; background: #604D53; color: #FFDBDA; font-size: 13px; cursor: pointer; border-radius: 4px;" style-hover="background: #4A3B3E;">Ekle</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ linkMenu }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeLinkMenu }}" style="position: fixed; inset: 0; background: rgba(61,43,46,0.35); display: flex; align-items: center; justify-content: center; z-index: 50;">
+      <div onClick="{{ stopClick }}" style="background: #FFFBFA; border-radius: 6px; padding: 22px 24px; width: 320px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 12px 40px rgba(61,43,46,0.25);">
+        <div style="font-family: 'Newsreader', Georgia, serif; font-size: 17px; color: #3D2B2E; line-height: 1.35;">{{ linkMenuTitle }}</div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="padding: 11px 14px; background: #604D53; color: #FFDBDA; font-size: 13px; text-align: center; cursor: pointer; border-radius: 4px;" style-hover="background: #4A3B3E;">Linke git</div>
+          <div onClick="{{ closeLinkMenu }}" style="padding: 11px 14px; border: 1px solid #D5C5C8; color: #604D53; font-size: 13px; text-align: center; cursor: pointer; border-radius: 4px;" style-hover="background: #F7E4E3;">Detayları gör</div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+const ROSE = '#DB7F8E', TAUPE = '#604D53', STEEL = '#9DA3A4';
+
+const MONTHS = [
+  { name: 'Ağustos 2026', count: 14,
+    summary: 'Bu ay ağırlık kontrol tarafındaydı: durum-uzay modellemesini oturttun, PID’de integral windup’ı ilk kez elinle gördün ve gözlemci tasarımına giriş yaptın. İki hafta boyunca aynı konuya dönmüş olman notlarda görünüyor — dağılmadın.',
+    tags: ['kontrol sistemleri', 'gömülü', 'sayısal analiz'],
+    notes: [
+      { date: '27 Ağu', title: 'Integral windup’ı motor sürücüde yakaladım', body: 'Doyuma giren PWM çıkışında integral terim büyümeye devam ediyordu; clamping ekleyince aşım 18%’den 4%’e indi. Anti-windup’ın neden “hile” değil de zorunluluk olduğunu anladım.', source: 'Bir Şey Öğrendim', dot: ROSE, link: 'girişe git' },
+      { date: '22 Ağu', title: 'Durum-uzay: A matrisi neyi anlatıyor', body: 'Özdeğerlerin gerçel kısmı kararlılığı, sanal kısmı salınımı veriyor. Transfer fonksiyonundan geçiş artık mekanik bir işlem gibi değil.', source: 'Bir Şey Öğrendim', dot: ROSE, link: 'girişe git' },
+      { date: '15 Ağu', title: 'STM32’de timer tabanlı örnekleme', body: 'delay() ile örnekleme yapmanın kontrol döngüsünü neden bozduğunu ölçtüm. Jitter 3 ms’den 40 µs’ye düştü.', source: 'Araştırılacak Konular · kapandı', dot: STEEL, link: '' },
+      { date: '6 Ağu', title: 'Bode diyagramını elle çizmek', body: 'Asimptotik yaklaşımla çizince kazanç payı/faz payı sezgisi oturdu. Simülasyona bakmadan tahmin edebiliyorum artık.', source: 'Bir Şey Öğrendim', dot: ROSE, link: 'girişe git' }
+    ] },
+  { name: 'Temmuz 2026', count: 9,
+    summary: 'Staj dönemi. Notların teoriden çok ölçüm ve pratiğe kaydı: osiloskop probu kompanzasyonu, toprak döngüleri, kart üstünde gürültü avı. Az sayıda ama uzun girişler.',
+    tags: ['ölçme', 'analog', 'staj'],
+    notes: [
+      { date: '28 Tem', title: 'Toprak döngüsü gürültüsünü ilk kez ölçtüm', body: 'Tek noktadan topraklama ile 50 Hz bileşen 12 dB düştü. Şemada güzel görünen şeyin kartta neden çalışmadığını gördüm.', source: 'Bir Şey Öğrendim', dot: ROSE, link: 'girişe git' },
+      { date: '19 Tem', title: 'Prob kompanzasyonu', body: '1 kHz kare dalga ile probu ayarlamayı öğrenmeden yaptığım bütün yükselme süresi ölçümleri yanlıştı.', source: 'Bir Şey Öğrendim', dot: ROSE, link: '' },
+      { date: '9 Tem', title: 'LDO ile buck arasındaki seçim', body: 'Verim–gürültü ödünleşimi: analog ön uç için LDO, dijital taraf için buck. Sebebini artık cümleyle kurabiliyorum.', source: 'Araştırılacak Konular · kapandı', dot: STEEL, link: '' }
+    ] },
+  { name: 'Haziran 2026', count: 11,
+    summary: 'Final dönemi: sinyaller ve sistemler ağırlıklı. Fourier’i “formül” olarak değil “bakış açısı” olarak yazdığın üç giriş var — dönüm noktası gibi görünüyor.',
+    tags: ['sinyaller', 'matematik'],
+    notes: [
+      { date: '24 Haz', title: 'Pencereleme neden gerekiyor', body: 'Sonlu kayıt = dikdörtgen pencere = spektral sızıntı. Hann pencereyi keyfi bir seçim sanıyordum.', source: 'Bir Şey Öğrendim', dot: ROSE, link: 'girişe git' },
+      { date: '17 Haz', title: 'Konvolüsyonun fiziksel anlamı', body: 'Dürtü yanıtının kaydırılmış toplamı. Grafik yöntemi ezberden çıktı.', source: 'Bir Şey Öğrendim', dot: ROSE, link: '' },
+      { date: '5 Haz', title: 'Örnekleme teoremini yanlış hatırlıyormuşum', body: 'Nyquist frekansı ile örnekleme frekansını karıştırıyordum; katlanma (aliasing) demosu ile düzeldi.', source: 'Bir Şey Öğrendim', dot: ROSE, link: '' }
+    ] }
+];
+
+const ENTRIES = [
+  { date: '27 Ağu 2026', len: '6 dk', title: 'Integral windup’ı motor sürücüde yakaladım', teaser: 'Doyuma giren çıkış, büyümeye devam eden integral terim ve 18%’lik aşım.' },
+  { date: '22 Ağu 2026', len: '11 dk', title: 'Durum-uzay: A matrisi neyi anlatıyor', teaser: 'Özdeğerler, kararlılık ve transfer fonksiyonuna geri dönüş.' },
+  { date: '15 Ağu 2026', len: '4 dk', title: 'STM32’de timer tabanlı örnekleme', teaser: 'delay() ile kontrol döngüsü kurmanın bedeli: 3 ms jitter.' },
+  { date: '6 Ağu 2026', len: '8 dk', title: 'Bode diyagramını elle çizmek', teaser: 'Asimptotlar, köşe frekansları ve faz payı sezgisi.' },
+  { date: '28 Tem 2026', len: '9 dk', title: 'Toprak döngüsü gürültüsünü ilk kez ölçtüm', teaser: 'Şemada güzel, kartta gürültülü. 50 Hz’in izini sürmek.' },
+  { date: '24 Haz 2026', len: '7 dk', title: 'Pencereleme neden gerekiyor', teaser: 'Spektral sızıntı, dikdörtgen pencere ve Hann.' }
+];
+
+const ARTICLES = [
+  { stamp: '27 Ağustos 2026 · 23:12 · 6 dk okuma · düzenlendi',
+    title: 'Integral windup’ı motor sürücüde yakaladım',
+    summary: 'PWM çıkışı doyuma girdiğinde integral terimin birikmeye devam etmesi, referans değiştiğinde büyük aşıma yol açıyor. Clamping tabanlı anti-windup ile aşım 18%’den 4%’e indi. Kazanım: doyum, kontrolcünün gördüğü dünyayı değiştirir.',
+    body: ['Sabah laboratuvarda basit bir hız kontrolü kuruyordum: DC motor, enkoder, klasik PID. Simülasyonda kusursuz çalışan katsayılar gerçek kartta referansı her değiştirdiğimde uzun süren bir aşımla cevap veriyordu.',
+      'Sorunun kaynağını anlamam yarım günümü aldı. Motor gerilim sınırına dayandığı anda kontrolcü hâlâ “daha fazla ver” diyor, ama sistem veremiyor. Hata sıfırlanmadığı için integral terim şişmeye devam ediyor. Referans düştüğünde bu birikmiş enerji boşalana kadar çıkış tepede kalıyor.',
+      'Çözüm beklediğimden basitti: integratörü çıkış sınırlarına göre kelepçelemek.'],
+    code: 'if (u > U_MAX) { u = U_MAX; if (e > 0) I -= Ki * e * dt; }\nif (u < U_MIN) { u = U_MIN; if (e < 0) I -= Ki * e * dt; }',
+    body2: ['Bu satırları eklediğim anda osiloskopta aşım 18%’den 4%’e indi, yerleşme süresi neredeyse yarıya düştü.',
+      'Asıl öğrendiğim şey anti-windup değil sanırım: doyum, kontrolcünün modelinde olmayan bir gerçek. Kağıt üzerinde doğru olan bir döngü, aktüatörünün sınırını bilmiyorsa yanlış davranır.'],
+    tags: ['kontrol sistemleri', 'PID', 'gömülü', 'laboratuvar'],
+    rel: 'Bağlantılı: Araştırılacak Konular · “anti-windup yöntemleri”' },
+  { stamp: '22 Ağustos 2026 · 21:40 · 11 dk okuma',
+    title: 'Durum-uzay: A matrisi neyi anlatıyor',
+    summary: 'Durum-uzay gösteriminde A matrisinin özdeğerleri sistemin kararlılığını ve salınım karakterini taşıyor. Transfer fonksiyonu ile geçiş artık ezber değil; her iki gösterimin ne zaman kolaylık sağladığı netleşti.',
+    body: ['Sinyaller dersinden beri durum-uzay gösterimini “matrislerle yazılmış aynı şey” sanıyordum. Bu hafta neden ayrı bir dil olduğunu anladım.',
+      'A matrisinin özdeğerleri, transfer fonksiyonunun kutuplarıyla aynı yerde duruyor. Ama çok girişli–çok çıkışlı bir sistemde transfer fonksiyonu bir matrise dönüşürken, durum-uzay hâlâ tek bir denklem takımı olarak kalıyor.'],
+    code: 'x_dot = A x + B u\ny     = C x + D u\neig(A) → kararlılık: Re(λ) < 0',
+    body2: ['Özdeğerin gerçel kısmı ne kadar solda, o kadar hızlı sönüm; sanal kısmı büyüdükçe salınım artıyor. Kutup yerleştirme fikri buradan doğal olarak çıkıyor.'],
+    tags: ['kontrol sistemleri', 'lineer cebir'],
+    rel: 'Bağlantılı: Akademik Gelişim · Ağustos 2026' }
+];
+
+const LINKS = [
+  { kind: 'Ders notu', kindColor: '#DB7F8E', date: '29 Ağu', title: 'Feedback Control of Dynamic Systems — çözümlü örnekler', url: 'stanford.edu/class/ee264/notes/...', note: 'Kutup yerleştirme bölümü derste anlatılandan çok daha net; problem 6.14 sınavda çıkacak tipte.', tags: ['kontrol', 'sınav'] },
+  { kind: 'GitHub', kindColor: '#604D53', date: '26 Ağu', title: 'stm32-pid-motor-control', url: 'github.com/.../stm32-pid-motor', note: 'Anti-windup uygulaması benim yazdığımdan temiz. Timer kesme yapısını buradan kopyaladım.', tags: ['gömülü', 'referans kod'] },
+  { kind: 'Video', kindColor: '#8C6B70', date: '21 Ağu', title: 'Why the Kalman filter works — görsel anlatım', url: 'youtube.com/watch?v=...', note: 'Formülden önce izlenmesi gereken şey. Belirsizliğin iki dağılımın çarpımı olduğu kısım çok iyi.', tags: ['tahmin', 'izlendi'] },
+  { kind: 'Araç', kindColor: '#9DA3A4', date: '18 Ağu', title: 'Falstad devre simülatörü', url: 'falstad.com/circuit/', note: 'Hızlı sezgi için. SPICE açmaya değmeyen RC/RL sorularında ilk durak.', tags: ['analog', 'simülasyon'] },
+  { kind: 'Makale', kindColor: '#DB7F8E', date: '12 Ağu', title: 'A Tutorial on Anti-Windup Schemes', url: 'ieeexplore.ieee.org/document/...', note: 'Clamping dışında back-calculation da var. Okumayı bitirmedim, bölüm 3’te kaldım.', tags: ['kontrol', 'yarım'] },
+  { kind: 'Başvuru', kindColor: '#604D53', date: '8 Ağu', title: 'TÜBİTAK 2209-A başvuru kılavuzu 2026', url: 'tubitak.gov.tr/tr/burslar/...', note: 'Bütçe kalemleri sayfa 11’de. Danışman onayı için son tarih başvurudan iki hafta önce.', tags: ['program', 'acil'] },
+  { kind: 'GitHub', kindColor: '#604D53', date: '3 Ağu', title: 'awesome-embedded-systems', url: 'github.com/.../awesome-embedded', note: 'Kaynak listesi. RTOS bölümünü staj sonrası taramak için işaretledim.', tags: ['gömülü', 'liste'] },
+  { kind: 'Blog', kindColor: '#8C6B70', date: '30 Tem', title: 'Grounding & shielding: pratik kurallar', url: 'analog.com/en/resources/...', note: 'Stajda öğrendiklerimi doğruladı. Tek nokta topraklama tam olarak nerede işe yaramıyor onu da yazmış.', tags: ['analog', 'ölçme'] }
+];
+
+const TOPICS = [
+  { title: 'Anti-windup yöntemleri: clamping mi back-calculation mı?', added: '14.08.2026', done: '27.08.2026', link: 'giriş yazıldı' },
+  { title: 'Enkoder çözünürlüğü hız gürültüsünü nasıl etkiliyor', added: '19.08.2026', done: '', link: '' },
+  { title: 'Neden Hann penceresi, neden Hamming değil', added: '20.06.2026', done: '24.06.2026', link: 'giriş yazıldı' },
+  { title: 'LDO vs buck: analog ön uçta hangisi', added: '02.07.2026', done: '09.07.2026', link: 'giriş yazıldı' },
+  { title: 'Kalman filtresinde R ve Q nasıl seçiliyor', added: '21.08.2026', done: '', link: '' },
+  { title: 'PCB’de dönüş akımı yolunu takip etmek', added: '25.08.2026', done: '', link: '' },
+  { title: 'Timer kesmesi ile DMA arasındaki seçim', added: '11.08.2026', done: '15.08.2026', link: 'giriş yazıldı' }
+];
+
+const PROJECTS = [
+  { state: 'Başlanacak', stateColor: '#DB7F8E', title: 'Enkoderli DC motor hız kontrol kartı', note: 'Kendi PCB’si, STM32G4, anti-windup’lı PID. Ağustos notlarının doğal devamı.', date: '26.08.2026' },
+  { state: 'Devam', stateColor: '#B0554F', title: 'Osiloskop verisi için Python analiz aracı', note: 'CSV → FFT → pencereleme karşılaştırması. Haziran girişleriyle bağlı.', date: '14.08.2026' },
+  { state: 'Fikir', stateColor: '#8C6B70', title: 'Ev içi sıcaklık haritası (Kalman’lı)', note: 'Beş sensör, tek merkez. R ve Q seçimini öğrenmeden başlanamaz.', date: '21.08.2026' },
+  { state: 'Fikir', stateColor: '#8C6B70', title: 'Ders notlarını yerel modelle indeksleyen arama', note: 'PDF + el yazısı taramaları. Bu sitenin arama katmanı olabilir.', date: '11.08.2026' },
+  { state: 'Beklemede', stateColor: '#9DA3A4', title: 'Analog ön uç: düşük gürültülü ölçüm kartı', note: 'Staj notları hazır, bütçe yok. 2209-A kabul olursa açılır.', date: '30.07.2026' }
+];
+
+const TODAY = '02.09.2026';
+
+window.__SEED_DAY_NOTES = {
+  1: [{ id: '1-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }, { id: '1-1', time: '16:00', end: '17:00', label: 'TÜBİTAK bütçe tablosu' }],
+  2: [{ id: '2-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }, { id: '2-1', time: '13:00', end: '15:00', label: 'Proje toplantısı' }],
+  3: [{ id: '3-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
+  4: [{ id: '4-0', time: '11:00', end: '12:30', label: 'Sayısal Analiz dersi' }],
+  5: [{ id: '5-0', time: '18:00', end: '19:00', label: 'Şiir yazma zamanı' }],
+  6: [],
+  8: [{ id: '8-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
+  9: [{ id: '9-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
+  10: [{ id: '10-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
+  11: [{ id: '11-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
+  15: [{ id: '15-0', time: '', label: 'TÜBİTAK 2209-A son başvuru' }, { id: '15-1', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }, { id: '15-2', time: '13:00', end: '15:00', label: 'Proje toplantısı' }],
+  16: [{ id: '16-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
+  17: [{ id: '17-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
+  18: [{ id: '18-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
+  22: [{ id: '22-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
+  23: [{ id: '23-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }, { id: '23-1', time: '16:00', end: '17:00', label: 'TEKNOFEST takım toplantısı' }],
+  24: [{ id: '24-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
+  25: [{ id: '25-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
+  29: [{ id: '29-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
+  30: [{ id: '30-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }]
+};
+const AUG31_BLOCKS = [{ s: 9, e: 10.5, label: 'Kontrol Sistemleri dersi' }, { s: 14, e: 14.5, label: 'Kütüphane rezervasyonu' }];
+
+function timeToHour(t) {
+  if (!t) return null;
+  const [h, m] = t.split(':').map(Number);
+  return h + (m || 0) / 60;
+}
+function dayBlockStyle(s, e) {
+  const long = (e - s) >= 1.25;
+  return 'position: absolute; box-sizing: border-box; left: 0; right: 0; top: ' + ((s - 8) * 56) + 'px; height: ' + ((e - s) * 56 - 4) + 'px; padding: 6px 10px; border-radius: 4px; font-size: 11.5px; line-height: 1.32; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; z-index: 1; ' +
+    (long ? 'background: #FFDBDA; color: #8C4650; border: 1px solid #F0BFC0;' : 'background: #F1E9E9; color: #604D53; border: 1px dashed #D5C5C8;');
+}
+
+class Component extends DCLogic {
+  state = {
+    screen: 'home', unlocked: false, entry: 0, pass: '',
+    w: typeof window !== 'undefined' ? window.innerWidth : 1440,
+    profileOpen: false, linkMenu: null,
+    addingProgram: false, qProgram: '',
+    qLink: '', qTopic: '', qProject: '',
+    extraLinks: [], extraTopics: [], extraProjects: [], extraPrograms: [],
+    topicOverrides: {}, calView: 'week', sidebarOpen: true,
+    dayPanel: null, dayPanelInput: '', dayPanelTime: '',
+    dayNotes: JSON.parse(JSON.stringify(window.__SEED_DAY_NOTES || {}))
+  };
+
+  componentDidMount() {
+    this._onResize = () => this.setState({ w: window.innerWidth });
+    window.addEventListener('resize', this._onResize);
+    this._onResize();
+    this._onHash = () => this.applyHash();
+    window.addEventListener('hashchange', this._onHash);
+    this.applyHash();
+  }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this._onResize);
+    window.removeEventListener('hashchange', this._onHash);
+  }
+
+  applyHash() {
+    const h = (window.location.hash || '').replace('#', '');
+    if (!h) return;
+    const [scr, entryStr] = h.split('/');
+    const valid = ['home', 'growth', 'learn', 'diary', 'links', 'projects', 'calendar', 'poems', 'topics'];
+    if (valid.includes(scr)) {
+      const upd = { screen: scr };
+      if (entryStr !== undefined) upd.entry = parseInt(entryStr, 10) || 0;
+      this.setState(upd);
+    }
+  }
+
+  academic() {
+    return [
+      { key: 'growth', label: 'Akademik Gelişim', count: '42' },
+      { key: 'learn', label: 'Bir Şey Öğrendim', count: '31' },
+      { key: 'links', label: 'Linkler', count: String(86 + this.state.extraLinks.length) },
+      { key: 'projects', label: 'Yapılacak Projeler', count: String(12 + this.state.extraProjects.length) },
+      { key: 'calendar', label: 'Program Takvimi', count: String(7 + this.state.extraPrograms.length) },
+      { key: 'topics', label: 'Araştırılacak Konular', count: String(23 + this.state.extraTopics.length) }
+    ];
+  }
+  personal() {
+    return [
+      { key: 'diary', label: 'Günlük', count: '·' },
+      { key: 'poems', label: 'Şiir', count: '9' }
+    ];
+  }
+
+  go = (k) => () => { window.location.hash = k; if (window.location.hash.replace('#', '') === k) this.setState({ screen: k }); };
+  goBack = () => { if (window.history.length > 1) window.history.back(); else window.location.hash = 'home'; };
+
+  MODULE_LABELS = { growth: 'Akademik Gelişim', learn: 'Bir Şey Öğrendim', links: 'Linkler', projects: 'Yapılacak Projeler', calendar: 'Program Takvimi', poems: 'Şiir', topics: 'Araştırılacak Konular', diary: 'Günlük' };
+
+  pill(active) {
+    return 'font-family: \'IBM Plex Sans\', Helvetica, sans-serif; font-size: 12.5px; font-weight: 500; padding: 6px 12px; cursor: pointer; border-radius: 2px; ' +
+      (active ? 'background: #604D53; color: #FFDBDA;' : 'color: #604D53; border: 1px solid #D5C5C8;');
+  }
+
+  navStyle(active) {
+    return 'display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 8px 10px; margin: 0 -10px; border-radius: 3px; cursor: pointer; font-size: 14px; line-height: 1.3; ' +
+      (active ? 'background: #FFDBDA; color: #3D2B2E; font-weight: 500;' : 'color: #4A3B3E;');
+  }
+
+  toggleTopicAt = (i) => () => {
+    this.setState(s => {
+      const cur = s.topicOverrides[i];
+      const wasDone = cur ? cur.done : !!TOPICS[i].done;
+      return { topicOverrides: { ...s.topicOverrides, [i]: { done: !wasDone, date: !wasDone ? TODAY : '' } } };
+    });
+  };
+
+  openLinkMenu = (title) => () => this.setState({ linkMenu: title });
+
+  renderVals() {
+    const s = this.state;
+
+    const academicNav = this.academic().map(n => ({ ...n, go: this.go(n.key), style: this.navStyle(s.screen === n.key) }));
+    const personalNav = this.personal().map(n => ({ ...n, go: this.go(n.key), style: this.navStyle(s.screen === n.key) }));
+
+    const article = ARTICLES[Math.min(s.entry, 1)];
+
+    const w = s.w || 1440;
+    const narrow = w < 1180, tight = w < 860;
+    const stack = 'display: grid; grid-template-columns: 1fr; gap: 34px; align-items: start;';
+
+    const allTopics = TOPICS.map((t, i) => {
+      const ov = s.topicOverrides[i];
+      const done = ov ? ov.done : !!t.done;
+      const doneDate = ov ? ov.date : t.done;
+      return { ...t, i, done, doneDate };
+    });
+    const extraTopicsList = s.extraTopics.map((title, j) => ({ title, i: 'extra' + j, added: TODAY, done: false, doneDate: '', link: '' }));
+
+    const openTopicsAll = [...extraTopicsList, ...allTopics.filter(t => !t.done)].slice(0, 6).map(t => ({
+      title: t.title,
+      toggle: typeof t.i === 'number' ? this.toggleTopicAt(t.i) : () => {}
+    }));
+
+    const hourLabels = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'];
+    const dayDefs = [
+      { label: 'PZT', date: '31 Ağu', dayNum: null },
+      { label: 'SAL', date: '1 Eyl', dayNum: 1 },
+      { label: 'ÇAR', date: '2 Eyl', dayNum: 2 },
+      { label: 'PER', date: '3 Eyl', dayNum: 3 },
+      { label: 'CUM', date: '4 Eyl', dayNum: 4 },
+      { label: 'CMT', date: '5 Eyl', dayNum: 5 },
+      { label: 'PAZ', date: '6 Eyl', dayNum: 6 }
+    ];
+    const weekDays = dayDefs.map(d => {
+      const rawBlocks = d.dayNum === null
+        ? AUG31_BLOCKS
+        : (s.dayNotes[d.dayNum] || []).filter(it => it.time).map(it => ({ s: timeToHour(it.time), e: it.end ? timeToHour(it.end) : timeToHour(it.time) + 1, label: it.label }));
+      return {
+        label: d.label, date: d.date,
+        blocks: rawBlocks.map(b => ({ label: b.label, style: dayBlockStyle(b.s, b.e) }))
+      };
+    });
+
+    const startOffset = 1; // 1 Eylül 2026 = Salı → Pazartesi hücresi boş
+    const monthCells = Array.from({ length: 42 }, (_, i) => {
+      const dayNum = i - startOffset + 1;
+      const valid = dayNum >= 1 && dayNum <= 30;
+      const count = valid ? (s.dayNotes[dayNum] || []).length : 0;
+      return {
+        day: valid ? dayNum : '',
+        dots: Array.from({ length: Math.min(count, 4) }),
+        open: valid ? () => this.setState({ dayPanel: dayNum, dayPanelInput: '', dayPanelTime: '' }) : () => {},
+        style: 'min-height: 110px; padding: 14px 14px; border-left: 1px solid #EEDFDF; border-top: 1px solid #EEDFDF; cursor: ' + (valid ? 'pointer' : 'default') + '; ' + (valid ? '' : 'background: #FBF1F0;'),
+        hoverStyle: valid ? 'background: #FCF3F2;' : '',
+        dayStyle: 'font-family: \'Newsreader\', Georgia, serif; font-size: 16px; color: #3D2B2E;'
+      };
+    });
+
+    const homeLinksData = [...s.extraLinks, ...LINKS].slice(0, 3).map(l => ({ title: l.title, kind: l.kind || 'Link', open: this.openLinkMenu(l.title) }));
+    const homeProjectsData = [...s.extraProjects, ...PROJECTS].slice(0, 3).map(p => ({ title: p.title, state: p.state, stateColor: p.stateColor }));
+
+    return {
+      gridLearn: narrow ? stack : 'display: grid; grid-template-columns: 300px minmax(420px, 1fr); gap: 48px; align-items: start;',
+      gridGrowth: narrow ? stack : 'display: grid; grid-template-columns: 290px minmax(430px, 1fr); gap: 48px; align-items: start;',
+      gridHome: narrow ? 'display: grid; grid-template-columns: 1fr; gap: 48px;' : 'display: grid; grid-template-columns: 1.35fr 1fr; gap: 56px;',
+      gridThree: 'display: grid; grid-template-columns: repeat(' + (w < 900 ? 1 : 3) + ', 1fr); gap: 20px;',
+      gridStats: 'display: grid; grid-template-columns: repeat(' + (tight ? 2 : 4) + ', 1fr); gap: 1px; background: #D5C5C8; border: 1px solid #D5C5C8;',
+      gridLinks: 'display: grid; grid-template-columns: repeat(' + (narrow ? 1 : 2) + ', 1fr); gap: 1px; background: #D5C5C8; border: 1px solid #D5C5C8;',
+      gridTopicHead: narrow ? 'display: none;' : 'display: grid; grid-template-columns: minmax(0, 1fr) 100px 100px 150px; gap: 16px; padding: 0 6px 10px; border-bottom: 1px solid #E8D3D3; font-family: \'IBM Plex Mono\', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #8C6B70;',
+      gridTopicRow: narrow
+        ? 'display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 14px 6px; border-bottom: 1px solid #F1E4E4; align-items: center;'
+        : 'display: grid; grid-template-columns: minmax(0, 1fr) 100px 100px 150px; gap: 16px; padding: 15px 6px; border-bottom: 1px solid #F1E4E4; align-items: center;',
+      rowMain: narrow ? 'flex: 1 0 100%;' : '',
+      articleStyle: 'border: 1px solid #E8D3D3; background: #FFFBFA; padding: ' + (tight ? '26px 24px 30px' : '40px 44px 46px') + '; display: flex; flex-direction: column; gap: 26px; min-width: 0;',
+      mainPad: 'flex: 1; min-width: 0; padding: ' + (tight ? '36px 26px 80px' : '56px 56px 96px') + '; max-width: 1240px;',
+      sidebarStyle: s.sidebarOpen
+        ? 'width: ' + (tight ? 210 : 260) + 'px; flex: 0 0 ' + (tight ? 210 : 260) + 'px; border-right: 1px solid #E8D3D3; padding: 30px 22px 26px; display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; height: 100vh; background: #F3E3E3; transition: width 0.15s ease;'
+        : 'width: 0; flex: 0 0 0; border-right: none; padding: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; height: 100vh; background: #F3E3E3; transition: width 0.15s ease;',
+      listGrid: narrow
+        ? 'display: flex; flex-direction: column; gap: 6px; padding: 18px 6px; border-bottom: 1px solid #F1E4E4;'
+        : 'display: grid; grid-template-columns: 110px minmax(0, 1fr) 140px; gap: 20px; padding: 20px 6px; border-bottom: 1px solid #F1E4E4; align-items: baseline;',
+
+      academicNav, personalNav,
+      homeItemStyle: this.navStyle(s.screen === 'home'),
+      goHome: this.go('home'),
+      profileOpen: s.profileOpen,
+      toggleProfile: () => this.setState({ profileOpen: !s.profileOpen }),
+      sidebarOpen: s.sidebarOpen,
+      toggleSidebar: () => this.setState({ sidebarOpen: !s.sidebarOpen }),
+      sidebarToggleStyle: 'position: fixed; top: 26px; left: ' + (s.sidebarOpen ? (tight ? 196 : 246) : 14) + 'px; width: 28px; height: 28px; border-radius: 50%; background: #FFFBFA; border: 1px solid #D5C5C8; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 40; color: #604D53; font-size: 13px; transition: left 0.15s ease;',
+      sidebarToggleIcon: s.sidebarOpen ? '‹' : '›',
+      showBreadcrumb: s.screen !== 'home',
+      goBack: this.goBack,
+      crumbModule: this.MODULE_LABELS[s.screen] || '',
+      crumbEntry: s.screen === 'learn' ? article.title : '',
+
+      isHome: s.screen === 'home',
+      isGrowth: s.screen === 'growth',
+      isLearn: s.screen === 'learn',
+      isLinks: s.screen === 'links',
+      isProjects: s.screen === 'projects',
+      isCalendar: s.screen === 'calendar',
+      isPoems: s.screen === 'poems',
+      isTopics: s.screen === 'topics',
+      isDiaryLocked: s.screen === 'diary' && !s.unlocked,
+      isDiaryOpen: s.screen === 'diary' && s.unlocked,
+      goLearn: this.go('learn'),
+      goGrowth: this.go('growth'),
+      pass: s.pass,
+      onPass: (e) => this.setState({ pass: e.target.value }),
+      unlock: () => this.setState({ unlocked: true }),
+      lock: () => this.setState({ unlocked: false, pass: '' }),
+
+      stats: [
+        { value: '14', label: 'Gelişim notu (Ağustos)', sub: 'Akademik Gelişim’e bu ay eklenen kayıt sayısı' },
+        { value: '9', label: 'Kesintisiz kayıt', sub: 'Art arda en az bir kayıt eklenen hafta sayısı' },
+        { value: '6/23', label: 'Kapanan merak konusu', sub: 'Bu ay tamamlananlar' },
+        { value: '4 gün', label: 'Son girişten bu yana', sub: '' }
+      ],
+      recent: ENTRIES.slice(0, 4).map((e, i) => ({
+        date: e.date.replace(' 2026', ''),
+        title: e.title,
+        summary: e.teaser,
+        open: () => { window.location.hash = 'learn/' + (i < 2 ? i : 0); this.setState({ screen: 'learn', entry: i < 2 ? i : 0 }); }
+      })),
+      upcoming: [
+        { month: 'Eyl', day: '15', title: 'TÜBİTAK 2209-A · 2. dönem', note: 'Proje önerisi + danışman onayı', left: '15 gün kaldı', color: '#B0554F' },
+        { month: 'Eki', day: '02', title: 'TEKNOFEST takım başvurusu', note: 'Kontrol kategorisi, 3 kişilik takım', left: '32 gün kaldı', color: '#8C6B70' },
+        { month: 'Kas', day: '20', title: 'IEEE öğrenci sempozyumu', note: 'Özet gönderimi', left: '81 gün kaldı', color: '#8C6B70' },
+        ...s.extraPrograms.map(p => ({ month: 'Yeni', day: '·', title: p, note: 'Az önce eklendi', left: '', color: '#8C6B70' }))
+      ],
+      addingProgram: s.addingProgram,
+      qProgram: s.qProgram,
+      onQProgram: (e) => this.setState({ qProgram: e.target.value }),
+      addProgram: () => this.setState({ addingProgram: true }),
+      saveProgram: () => { if (s.qProgram.trim()) this.setState(st => ({ extraPrograms: [...st.extraPrograms, st.qProgram.trim()], qProgram: '', addingProgram: false })); },
+
+      openTopics: openTopicsAll,
+      qTopic: s.qTopic,
+      onQTopic: (e) => this.setState({ qTopic: e.target.value }),
+      addTopic: () => { if (s.qTopic.trim()) this.setState(st => ({ extraTopics: [st.qTopic.trim(), ...st.extraTopics], qTopic: '' })); },
+      imgBtnIcon: () => {},
+
+      homeLinks: homeLinksData,
+      qLink: s.qLink,
+      onQLink: (e) => this.setState({ qLink: e.target.value }),
+      addLink: () => { if (s.qLink.trim()) this.setState(st => ({ extraLinks: [{ title: st.qLink.trim(), kind: 'Link', url: '', note: '', tags: [] }, ...st.extraLinks], qLink: '' })); },
+
+      homeProjects: homeProjectsData,
+      qProject: s.qProject,
+      onQProject: (e) => this.setState({ qProject: e.target.value }),
+      addProject: () => { if (s.qProject.trim()) this.setState(st => ({ extraProjects: [{ title: st.qProject.trim(), state: 'Fikir', stateColor: '#8C6B70', note: '', date: TODAY }, ...st.extraProjects], qProject: '' })); },
+
+      weekDays, hourLabels,
+      calTitle: s.calView === 'week' ? 'Haftalık program' : 'Aylık program',
+      isWeekView: s.calView === 'week',
+      isMonthView: s.calView === 'month',
+      setWeekView: () => this.setState({ calView: 'week' }),
+      setMonthView: () => this.setState({ calView: 'month' }),
+      weekToggleStyle: this.pill(s.calView === 'week'),
+      monthToggleStyle: this.pill(s.calView === 'month'),
+      weekDayLabels: ['PZT', 'SAL', 'ÇAR', 'PER', 'CUM', 'CMT', 'PAZ'],
+      monthCells,
+
+      dayPanelOpen: !!s.dayPanel,
+      dayPanelTitle: s.dayPanel ? s.dayPanel + ' Eylül 2026' : '',
+      dayPanelItems: (s.dayNotes[s.dayPanel] || []).map(it => ({
+        time: it.time || 'not',
+        label: it.label,
+        remove: () => this.setState(st => ({ dayNotes: { ...st.dayNotes, [s.dayPanel]: (st.dayNotes[s.dayPanel] || []).filter(x => x.id !== it.id) } }))
+      })),
+      dayPanelEmpty: !(s.dayNotes[s.dayPanel] || []).length,
+      dayPanelInput: s.dayPanelInput,
+      onDayPanelInput: (e) => this.setState({ dayPanelInput: e.target.value }),
+      dayPanelTime: s.dayPanelTime,
+      onDayPanelTime: (e) => this.setState({ dayPanelTime: e.target.value }),
+      closeDayPanel: () => this.setState({ dayPanel: null }),
+      addDayPanelItem: () => {
+        if (!s.dayPanelInput.trim()) return;
+        const d = s.dayPanel;
+        const newItem = { id: d + '-' + Date.now(), time: s.dayPanelTime || '', label: s.dayPanelInput.trim() };
+        this.setState(st => ({
+          dayNotes: { ...st.dayNotes, [d]: [...(st.dayNotes[d] || []), newItem] },
+          dayPanelInput: '', dayPanelTime: ''
+        }));
+      },
+
+      growthFilters: [
+        { label: 'Tümü', style: this.pill(true) },
+        { label: 'Kontrol', style: this.pill(false) },
+        { label: 'Gömülü', style: this.pill(false) },
+        { label: 'Analog', style: this.pill(false) },
+        { label: 'Matematik', style: this.pill(false) }
+      ],
+      months: MONTHS.map(m => ({
+        ...m,
+        bars: Array.from({ length: 14 }, (_, i) => {
+          const h = 6 + ((i * 7 + m.count * 3) % 26);
+          return { style: 'flex: 1; height: ' + h + 'px; background: ' + (h > 20 ? '#DB7F8E' : '#F0DADA') + ';' };
+        }),
+        notes: m.notes.map(n => ({ ...n, open: n.link ? this.goLearn : () => {}, cursor: n.link ? 'pointer' : 'default' }))
+      })),
+
+      entries: ENTRIES.map((e, i) => ({
+        ...e,
+        open: () => { window.location.hash = 'learn/' + (i < 2 ? i : 0); this.setState({ entry: i < 2 ? i : 0 }); },
+        style: 'display: flex; flex-direction: column; gap: 6px; padding: 16px 14px 17px; margin: 0; border-bottom: 1px solid #F1E4E4; cursor: pointer; ' +
+          (i === Math.min(s.entry, 1) ? 'background: #FCF3F2; border-left: 2px solid #DB7F8E; padding-left: 12px;' : 'border-left: 2px solid transparent; padding-left: 12px;')
+      })),
+      article,
+
+      linkFilters: [
+        { label: 'Tümü · 86', style: this.pill(true) },
+        { label: 'GitHub · 24', style: this.pill(false) },
+        { label: 'Ders notu · 19', style: this.pill(false) },
+        { label: 'Makale · 15', style: this.pill(false) },
+        { label: 'Araç · 12', style: this.pill(false) },
+        { label: 'Okunmadı · 8', style: this.pill(false) }
+      ],
+      links: [...s.extraLinks, ...LINKS].map(l => ({
+        kind: l.kind || 'Link', kindColor: l.kindColor || '#604D53', date: l.date || TODAY, title: l.title,
+        url: l.url || '', note: l.note || '', tags: l.tags || [], open: this.openLinkMenu(l.title)
+      })),
+
+      linkMenu: s.linkMenu,
+      linkMenuTitle: s.linkMenu,
+      closeLinkMenu: () => this.setState({ linkMenu: null }),
+      stopClick: (e) => e.stopPropagation(),
+
+      diary: [
+        { date: '27 Ağustos 2026 · 23:41', text: 'Bugün laboratuvarda tek başıma kaldığım üç saat, dönem boyunca dinlediğim bütün derslerden daha çok şey öğretti. Bir şeyin neden çalışmadığını bulmanın verdiği tat başka.' },
+        { date: '19 Ağustos 2026 · 00:12', text: 'Bölümü seçerken ne yaptığımı bilmiyordum, şimdi de tam bildiğimi söyleyemem. Ama artık merak ettiğim şeyler var ve bu yeterli geliyor.' },
+        { date: '3 Ağustos 2026 · 22:05', text: 'Stajın son günü. Kart üzerinde bir şeyi ölçerek anlamanın, kitapta okuyarak anlamaktan farklı bir sinir yolunu kullandığını düşünüyorum.' }
+      ],
+
+      projects: [...s.extraProjects, ...PROJECTS],
+
+      programs: [
+        { date: '15.09.2026', title: 'TÜBİTAK 2209-A · 2. dönem son başvuru', note: 'Proje önerisi, bütçe tablosu, danışman onayı', remind: '3 gün önce hatırlat', color: '#B0554F' },
+        { date: '02.10.2026', title: 'TEKNOFEST takım başvurusu', note: 'Kontrol ve otomasyon kategorisi', remind: '1 hafta önce', color: '#8C6B70' },
+        { date: '20.11.2026', title: 'IEEE öğrenci sempozyumu · özet', note: '250 kelime özet, poster opsiyonel', remind: '2 hafta önce', color: '#8C6B70' },
+        { date: '10.01.2027', title: 'TÜBİTAK 2242 lise/lisans yarışması', note: 'Ön kayıt açılışı', remind: 'takipte', color: '#9DA3A4' },
+        { date: '01.03.2027', title: 'Erasmus+ staj başvuru dönemi', note: 'Dil belgesi ve transkript hazır olmalı', remind: '1 ay önce', color: '#9DA3A4' },
+        ...s.extraPrograms.map(p => ({ date: TODAY, title: p, note: 'Ana sayfadan eklendi', remind: 'takipte', color: '#8C6B70' }))
+      ],
+
+      poems: [
+        { title: 'gece laboratuvarı', text: 'lehim dumanı ve saat üç\nbir direnç yanıyor sessizce\nkimse duymuyor\nama ben duyuyorum', date: '27.08.2026' },
+        { title: 'ölçüm', text: 'her şeyin bir hata payı var dediler\nsevmenin de mi\ndedim\ncevap vermediler', date: '12.08.2026' },
+        { title: 'kararlılık', text: 'kutuplar solda kalsın\nyeter', date: '24.06.2026' }
+      ],
+
+      topics: allTopics.map(t => ({
+        title: t.title,
+        added: t.added,
+        done: t.doneDate || '—',
+        doneColor: t.done ? '#604D53' : '#B79CA0',
+        link: t.link || '',
+        mark: t.done ? '✓' : '',
+        toggle: this.toggleTopicAt(t.i),
+        box: 'width: 15px; height: 15px; flex: 0 0 15px; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 10px; ' +
+          (t.done ? 'background: #604D53; color: #FFDBDA; border: 1px solid #604D53;' : 'border: 1px solid #B79CA0;'),
+        textStyle: 'font-size: 14.5px; line-height: 1.45; ' + (t.done ? 'color: #8C6B70;' : 'color: #3D2B2E;'),
+        linkStyle: 'text-align: right; font-family: \'IBM Plex Mono\', monospace; font-size: 10px; letter-spacing: 0.04em; ' +
+          (t.link ? 'color: #DB7F8E; cursor: pointer; border-bottom: 1px solid rgba(219,127,142,0.35);' : 'color: #B79CA0;')
+      }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>

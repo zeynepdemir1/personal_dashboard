@@ -1,0 +1,108 @@
+:root {
+  /* Ana palet */
+  --color-soft-blush: #ffdbda;
+  --color-old-rose: #db7f8e;
+  --color-old-rose-hover: #c96876;
+  --color-pale-slate: #d5c5c8;
+  --color-cool-steel: #9da3a4;
+  --color-taupe-grey: #604d53;
+  --color-taupe-grey-hover: #4a3b3e;
+
+  /* Türetilmiş tonlar */
+  --color-bg: #fbf1f0;
+  --color-ink: #3d2b2e;
+  --color-ink-faint: #8c6b70;
+  --color-ink-fainter: #a9767d;
+  --color-border: #e8d3d3;
+  --color-border-faint: #f1e4e4;
+  --color-panel: #fffbfa;
+  --color-panel-alt: #fcf3f2;
+  --color-sidebar-bg: #f3e3e3;
+  --color-hover-pink: #f7e4e3;
+  --color-nav-hover: #f0bfc0;
+  --color-chip-text: #8c4650;
+  --color-placeholder: #b79ca0;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'IBM Plex Sans', Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--color-old-rose);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(219, 127, 142, 0.35);
+}
+a:hover {
+  color: var(--color-old-rose-hover);
+  border-bottom-color: rgba(201, 104, 118, 0.6);
+}
+
+::selection {
+  background: var(--color-soft-blush);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-placeholder);
+}
+
+input,
+textarea {
+  font-family: inherit;
+}
+
+/* Hover utility classes — the design's inline `style-hover` interactions,
+   reproduced with real CSS since React has no equivalent shorthand. */
+.hover-row:hover {
+  background: var(--color-hover-pink) !important;
+}
+.hover-row-alt:hover {
+  background: var(--color-panel-alt) !important;
+}
+.hover-underline:hover {
+  border-bottom-color: var(--color-old-rose) !important;
+}
+.btn-dark {
+  background: var(--color-taupe-grey);
+  color: var(--color-soft-blush);
+}
+.btn-dark:hover {
+  background: var(--color-taupe-grey-hover) !important;
+}
+.btn-outline-hover:hover {
+  background: var(--color-hover-pink) !important;
+}
+.btn-outline-invert:hover {
+  background: var(--color-taupe-grey) !important;
+  color: var(--color-soft-blush) !important;
+}
+.text-hover-rose:hover {
+  color: var(--color-old-rose) !important;
+}
+.text-hover-red:hover {
+  color: #c0554f !important;
+}
+.chip-hover:hover {
+  background: var(--color-soft-blush) !important;
+}
+
+/* Sol menü: aktif sayfa kalıcı/hafif vurgulu (bkz. theme.ts navItemStyle),
+   hover bundan daha koyu bir tonda — ikisi karışmasın diye ayrı sınıf. */
+.nav-hover:hover {
+  background: var(--color-nav-hover) !important;
+}
