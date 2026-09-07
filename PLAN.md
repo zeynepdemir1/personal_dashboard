@@ -76,12 +76,19 @@ Bu proje, Claude Design'da tasarımı tamamlanmış bir kişisel dashboard/blog 
 - ~~llama3.1:8b bazen özet cümlesine gereksiz bir meta-yorum ekliyordu~~ — **düzeltildi**: `system` talimatı sıkılaştırıldı (net kurallar listesi + "meta-yorum ekleme" yasağı) ve bir güvenlik ağı eklendi (`firstSentenceOnly` — model yine de birden fazla cümle dönerse sadece ilkini alır). Gerçek modelle tekrar test edildi, artık tek ve temiz cümle üretiyor.
 
 ## Aşama 11 — Program Keşfi (Otomatik Arama)
-Aşama 10 (özetleme) bittikten sonra ele alınacak.
-- [ ] Ücretsiz kotalı bir arama API'si (ör. Brave Search API) ile önceden tanımlanmış anahtar kelime listesiyle (TÜBİTAK, Teknofest, hackathon, bootcamp, üniversite yarışmaları vb.) periyodik tarama
+**API kararı:** Başlangıçta Brave Search API planlanmıştı ama Zeynep araştırdı: Brave Şubat 2026'dan itibaren yeni kayıtlarda kart bilgisi istiyor ve kredi bitince otomatik ücretlendirmeye geçiyor — gerçek bir ücretsiz katmanı kalmadı. Bunun yerine **SerpApi** kullanılıyor: kart istemeden kayıt, ayda otomatik yenilenen 250 ücretsiz sorgu (`SERPAPI_KEY`, bkz. `.env.example`).
+- [ ] SerpApi ile önceden tanımlanmış anahtar kelime listesiyle (Zeynep'ten alınacak — TÜBİTAK, Teknofest, hackathon, bootcamp, üniversite yarışmaları vb. örnek kategoriler) periyodik tarama
 - [ ] Bulunan sonuçları veritabanında sakla; daha önce görülenleri tekrar gösterme (deduplication)
 - [ ] Kota sınırına yaklaşınca taramayı durdur, bir sonraki periyoda (günlük/haftalık) ertele
 - [ ] Yerel model (Ollama) yeni sonuçları kullanıcının Akademik Gelişim içeriğiyle eşleştirip önem sırasına göre önersin
 - [ ] İleride değerlendirilecek: anahtar kelimelerin kullanıcı içeriğinden otomatik çıkarılması (şimdilik kapsam dışı)
+
+### Açık mimari sorusu — kalıcı depolama
+Bu aşama ilk kez gerçek bir "veritabanı" gerektiriyor: tarama periyodik olarak (muhtemelen GitHub Actions ile, Aşama 15'teki Telegram bildirimiyle aynı desen) tarayıcı hiç açık değilken sunucu tarafında tetiklenecek, dedup listesi taramalar arasında kalıcı olmalı. Ama:
+- Uygulamanın tüm verisi bugüne kadar sadece tarayıcının `localStorage`'ında — sunucuda hiç veritabanı yok.
+- Render'ın ücretsiz planında disk kalıcı değil (bkz. Aşama 16 — bu yüzden fotoğraflar için Cloudinary'e geçildi), yani sonuçları sunucunun kendi diskine yazmak güvenilir değil.
+- Ollama'nın önem sırasına göre önerisi sadece Zeynep'in kendi bilgisayarında (Ollama'nın çalıştığı yerde) mümkün — bu yüzden "tarama" (sunucu/bulut tarafı, otomatik) ile "Ollama'nın sıralaması" (yerel, uygulama açıldığında, Aşama 12'deki gecikmeli kuyruk deseniyle aynı mantık) iki ayrı adım olacak.
+- Depolama seçeneği Zeynep ile netleştirilecek (ör. ücretsiz kotalı bir hosted veritabanı mı, git deposunu basit bir JSON "veritabanı" olarak mı kullanmak, yoksa kapsamı daraltıp dedup'ı sadece tarayıcı localStorage'ında mı tutmak — bu sonuncusu sadece uygulama o taramadan sonra açılırsa çalışır, arka planda sürekli doğru dedup garantisi vermez).
 
 ## Aşama 12 — Gecikmeli Özetleme Kuyruğu ✅
 - [x] Her Bir Şey Öğrendim girişine bir durum alanı ekle: `özetlenmedi` / `özetlendi` — ayrı bir alan yerine mevcut `summary` alanının varlığından türetiliyor (persisted `learnEntries` zaten sadece kullanıcı girişlerini tutuyor, seed girişlerin hepsinde `summary` her zaman dolu — bu yüzden ek/yinelenen bir alan gereksiz olurdu); Learn ekranında özet yoksa küçük bir "özetlenmedi" göstergesi çıkıyor
