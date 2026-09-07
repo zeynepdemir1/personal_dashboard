@@ -24,9 +24,21 @@ npm run build
 ## Notlar
 
 - Ekleme/işaretleme gibi tüm değişiklikler tarayıcının `localStorage`'ında
-  saklanır — sunucu veya hesap yok, tamamen yerel.
+  saklanır — hesap/oturum yok, tek profilli ve tamamen yerel. İstisna:
+  fotoğraflar artık Cloudinary'de tutuluyor (aşağıya bakın), localStorage'da
+  sadece bunların URL'i duruyor.
 - Ekran geçişleri URL hash'i ile senkronize (`#growth`, `#learn/0` gibi), bu
   yüzden geri/ileri tuşları ve doğrudan bağlantılar çalışır.
+- Fotoğraf yükleme (Merak Konuları/Proje Fikirleri): istemci görseli önce
+  küçültür (`src/lib/image.ts`), sonra `/api/upload-image` üzerinden
+  Cloudinary'ye yükler ve dönen kalıcı URL'i kaydeder. Bu uç nokta hem
+  `npm run dev` hem production'da çalışır (bkz. `vite.config.ts` ve
+  `server.js`) — Cloudinary ortam değişkenleri tanımlı değilse yükleme
+  503 ile başarısız olur ve kullanıcıya inline bir hata gösterilir.
+- Günlük Telegram bildirimi: `server.js`'teki `/api/notify/daily` uç
+  noktası, GitHub Actions'taki zamanlanmış bir workflow (bkz.
+  `.github/workflows/daily-telegram-notify.yml`) tarafından her gün
+  tetiklenir ve o günkü yaklaşan programları Telegram'a gönderir.
 
 ## Yayına alma (deployment)
 
@@ -46,10 +58,19 @@ Start command: npm start
 
 **Ortam değişkenleri** (hosting panelinden eklenir, kod içinde yazılmaz):
 
-| Değişken       | Zorunlu mu | Açıklama |
-|----------------|------------|----------|
-| `GCAL_ICS_URL` | Hayır      | Google Calendar > Ayarlar > (takvim) > "Takvimi entegre et" > "iCal formatındaki gizli adres". Ayarlanmazsa uygulama normal çalışır, sadece takvim senkronizasyonu pasif kalır. |
-| `PORT`         | Hayır      | Çoğu platform bunu otomatik ayarlar; `server.js` `process.env.PORT`'u okur, yoksa `3000`'e düşer. |
+| Değişken                 | Zorunlu mu | Açıklama |
+|--------------------------|------------|----------|
+| `GCAL_ICS_URL`           | Hayır      | Google Calendar > Ayarlar > (takvim) > "Takvimi entegre et" > "iCal formatındaki gizli adres". Ayarlanmazsa uygulama normal çalışır, sadece takvim senkronizasyonu pasif kalır. |
+| `PORT`                   | Hayır      | Çoğu platform bunu otomatik ayarlar; `server.js` `process.env.PORT`'u okur, yoksa `3000`'e düşer. |
+| `CLOUDINARY_CLOUD_NAME`  | Hayır*     | Cloudinary Dashboard'dan alınır. Fotoğraf yükleme için gerekli — tanımlı değilse fotoğraf ekleme başarısız olur (uygulamanın geri kalanı etkilenmez). |
+| `CLOUDINARY_API_KEY`     | Hayır*     | Cloudinary Dashboard'dan alınır. |
+| `CLOUDINARY_API_SECRET`  | Hayır*     | Cloudinary Dashboard'dan alınır — asla istemciye gönderilmez, sadece sunucu tarafında kullanılır. |
+| `TELEGRAM_BOT_TOKEN`     | Hayır*     | @BotFather ile oluşturulan bot token'ı. Günlük Telegram bildirimi için gerekli. |
+| `TELEGRAM_CHAT_ID`       | Hayır*     | Bildirimin gideceği sohbetin kimliği. |
+| `CRON_SECRET`            | Hayır*     | `/api/notify/daily` uç noktasını dışarıdan (GitHub Actions) tetiklerken kullanılan paylaşılan sır; GitHub repo secrets'a da aynısı eklenmeli. |
+
+\* Uygulamanın temel işlevleri için zorunlu değil, ama ilgili özellik
+(fotoğraf yükleme / Telegram bildirimi) bu değişkenler olmadan çalışmaz.
 
 Yerel geliştirmede aynı değişken `.env.local` dosyasından okunur (bkz.
 `.env.example`) — bu dosya asla commit edilmez.

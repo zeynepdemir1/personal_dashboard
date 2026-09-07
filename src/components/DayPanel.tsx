@@ -19,7 +19,7 @@ export function DayPanel() {
     <>
       <div
         onClick={app.closeDayPanel}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(61,43,46,0.28)', zIndex: 55 }}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(61,43,46,0.28)', zIndex: 55, cursor: 'pointer' }}
       />
       <div
         style={{

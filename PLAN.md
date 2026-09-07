@@ -160,11 +160,11 @@ Zeynep'in isteği: Aşama 15'teki `compressImage()` sıkıştırması geçici bi
 - **Dev/prod paritesi:** Cloudinary yüklemesi basit bir pass-through proxy olamaz (SDK sunucu tarafında imzalama yapıyor), bu yüzden `vite.config.ts`'e de aynı mantığı tekrarlayan küçük bir dev-only middleware eklendi (`uploadImageDevPlugin`) — böylece fotoğraf ekleme `npm run dev` sırasında da çalışıyor, sadece production'da test etmeye gerek yok. server.js ile vite.config.ts arasında küçük bir mantık tekrarı var (kabul edilebilir, iki dosya da zaten dev/prod ayrımını benzer şekilde yönetiyor).
 - **Kasıtlı güvenlik kararı:** `/api/upload-image` bir paylaşımlı sır (Telegram uç noktasındaki `CRON_SECRET` gibi) ile korunmuyor — çünkü tarayıcı normal kullanımda doğrudan bu uç noktaya istek atıyor ve istemci JS'ine gömülecek bir sır zaten herkes tarafından okunabilir olurdu, gerçek bir koruma sağlamazdı. Tek koruma: dosya boyutu sınırı (6MB) ve `data:image/` önekinin doğrulanması. Uygulama tek kullanıcılı olduğu ve gizli bir URL'de barındığı için kabul edilebilir bir risk.
 
-## Aşama 14 — Test ve Yayına Hazırlık
-- [ ] Tüm modüllerde hover/tıklanabilirlik göstergelerinin (pointer cursor) tutarlı çalıştığını doğrula
-- [ ] GitHub'a düzenli commit/push
-- [ ] README.md ile projeyi kısaca belgelendir
-- [ ] Barındırma (hosting) stratejisi — **Aşama 13'te Render/Railway olarak netleşti**, bu maddenin geri kalanı orada ele alınıyor
+## Aşama 14 — Test ve Yayına Hazırlık ✅
+- [x] Tüm modüllerde hover/tıklanabilirlik göstergelerinin (pointer cursor) tutarlı çalıştığını doğrula — tüm `onClick` alan elemanlar taranarak iki eksik bulundu ve düzeltildi: `LinkMenu.tsx` ve `DayPanel.tsx`'teki arka plan (backdrop) katmanları tıklanınca paneli kapatıyordu ama imleç normal okdu; artık `cursor: 'pointer'` eklendi
+- [x] GitHub'a düzenli commit/push — bu aşamaya kadar her aşama kendi commit'iyle push edildi
+- [x] README.md ile projeyi kısaca belgelendir — Cloudinary/Telegram/GitHub Actions eklerini yansıtacak şekilde güncellendi (ortam değişkenleri tablosu genişletildi, "Notlar" bölümüne fotoğraf yükleme ve günlük bildirim akışları eklendi)
+- [x] Barındırma (hosting) stratejisi — **Aşama 13'te Render/Railway olarak netleşti**, bu maddenin geri kalanı orada ele alındı
 
 ### Barındırma kararını etkileyecek teknik notlar
 - **Google Calendar senkronizasyonu (Aşama 9) geliştirmede sadece Vite dev-proxy ile çalışıyordu.** CORS yüzünden tarayıcı Google'ın iCal adresine doğrudan istek atamıyor. Aşama 13'te bunun için gerçek bir production çözümü kuruldu — detaylar Aşama 13'ün altında.

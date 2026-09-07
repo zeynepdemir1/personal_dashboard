@@ -22,6 +22,7 @@ export function LinkMenu() {
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 50,
+        cursor: 'pointer',
       }}
     >
       <div
