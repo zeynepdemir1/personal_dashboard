@@ -11,7 +11,8 @@ import {
 import { makeLearnEntry, type LearnEntry } from '../lib/learn';
 import { deriveTitleFromUrl } from '../lib/url';
 import { fetchGoogleCalendarEvents, type GCalEvent, type GCalSyncStatus } from '../lib/googleCalendar';
-import { pingOllama, summarizeLearnEntry } from '../lib/ollama';
+import { classifyProgramRelevance, pingOllama, summarizeLearnEntry } from '../lib/ollama';
+import { dismissProgram, fetchPendingPrograms, fetchRelevantPrograms, markFilteredPrograms, type DiscoveredProgram } from '../lib/discover';
 import { formatMonthDay, referenceToday } from '../lib/dates';
 import { DEFAULT_PROFILE_NAME } from '../lib/profile';
 import {
@@ -293,6 +294,9 @@ export interface AppStateValue {
 
   gcalStatus: GCalSyncStatus;
   gcalEvents: GCalEvent[];
+
+  discoveredPrograms: DiscoveredProgram[];
+  dismissDiscoveredProgram: (id: string) => void;
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -449,6 +453,56 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  // Program Keşfi (PLAN.md Aşama 11) — alakalı bulunmuş, henüz gizlenmemiş
+  // sonuçlar her açılışta çekiliyor (Home'daki "Keşfedilen Programlar"
+  // kartı için).
+  const [discoveredPrograms, setDiscoveredPrograms] = useState<DiscoveredProgram[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetchRelevantPrograms().then((items) => {
+      if (!cancelled) setDiscoveredPrograms(items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Aşama 12'deki gecikmeli özetleme kuyruğuyla AYNI mantık: GitHub
+  // Actions taraması ham sonuçları "filtrelenmedi" durumunda bırakır
+  // (profil filtresi orada UYGULANMAZ — sadece Ollama'nın erişilebilir
+  // olduğu bir cihazda mümkün). Burada, Ollama erişilebilirse bekleyen
+  // tüm sonuçlar sırayla (paralel değil) sınıflandırılıp tek bir istekte
+  // toplu olarak işaretleniyor — Telegram bildirimi de bu noktada
+  // (mark-filtered içinde) gönderiliyor, tarama anında değil.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const ok = await pingOllama();
+      if (cancelled || !ok) return;
+      const pending = await fetchPendingPrograms();
+      if (cancelled || pending.length === 0) return;
+      const results: { id: string; relevant: boolean }[] = [];
+      for (const item of pending) {
+        if (cancelled) return;
+        const relevant = await classifyProgramRelevance(item.title, item.snippet);
+        if (relevant === null) continue; // belirsiz/başarısız — filtrelenmedi durumunda kalsın, tekrar denenir
+        results.push({ id: item.id, relevant });
+      }
+      if (cancelled || results.length === 0) return;
+      await markFilteredPrograms(results);
+      const relevant = await fetchRelevantPrograms();
+      if (!cancelled) setDiscoveredPrograms(relevant);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const dismissDiscoveredProgram = (id: string) => {
+    setDiscoveredPrograms((cur) => cur.filter((p) => p.id !== id));
+    dismissProgram(id);
+  };
 
   const value: AppStateValue = useMemo(
     () => ({
@@ -883,6 +937,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
       gcalStatus,
       gcalEvents,
+
+      discoveredPrograms,
+      dismissDiscoveredProgram,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -914,6 +971,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       linkMenu,
       gcalStatus,
       gcalEvents,
+      discoveredPrograms,
     ],
   );
 

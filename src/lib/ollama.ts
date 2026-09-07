@@ -102,3 +102,40 @@ export async function summarizeLearnEntry(title: string, body: string): Promise<
     return null;
   }
 }
+
+// Program Keşfi (PLAN.md Aşama 11) için profil filtresi. GitHub Actions'ta
+// tarama sırasında UYGULANMIYOR — sadece burada, uygulama Ollama'nın
+// erişilebilir olduğu bir cihazda açıldığında (bkz. AppState.tsx'teki
+// gecikmeli kuyruk, Aşama 12'deki desenin aynısı) çağrılıyor. Başarısız
+// olursa (Ollama kapalı, zaman aşımı, belirsiz yanıt) null döner — sonuç
+// `filtrelenmedi` durumunda kalır, bir sonraki açılışta tekrar denenir.
+const PROFILE_DESCRIPTION =
+  'Mekatronik Mühendisliği öğrencisi, Marmara Üniversitesi. İlgi alanları: ' +
+  'gömülü sistemler, kontrol sistemleri, OpenCV, TensorFlow Lite, Linux, İHA/drone.';
+
+export async function classifyProgramRelevance(title: string, snippet: string): Promise<boolean | null> {
+  const system =
+    `Sen bir öğrencinin profiline göre iş/program ilanlarının alakalı olup olmadığını ` +
+    `değerlendiren bir asistansın. Profil: ${PROFILE_DESCRIPTION} Katı kurallar: ` +
+    '(1) SADECE "EVET" veya "HAYIR" yaz, başka hiçbir şey yazma. ' +
+    '(2) Genel mühendislik/TÜBİTAK/Teknofest/hackathon programları EVET sayılır. ' +
+    '(3) Maden, inşaat, kimya, tekstil gibi tamamen alakasız mühendislik dalları HAYIR sayılır.';
+  const prompt = `Başlık: ${title}\nAçıklama: ${snippet}`;
+
+  try {
+    const res = await fetch(`${BASE}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: MODEL, system, prompt, stream: false }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const raw = typeof data.response === 'string' ? data.response.trim().toUpperCase() : '';
+    if (raw.startsWith('EVET')) return true;
+    if (raw.startsWith('HAYIR')) return false;
+    return null;
+  } catch {
+    return null;
+  }
+}

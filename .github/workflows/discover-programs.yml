@@ -1,0 +1,23 @@
+name: Haftalık Program Keşfi taraması
+
+on:
+  schedule:
+    # 09:00 Türkiye saati (UTC+3), her Pazartesi = 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {} # elle test tetiklemek için
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Uygulamadaki tarama uç noktasını tetikle
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          # Render'ın ücretsiz planı boşta kalınca uyur; taramanın kendisi
+          # de (28 anahtar kelime × SerpApi çağrısı) biraz sürebilir —
+          # yüksek timeout + birkaç deneme bu yüzden gerekli.
+          curl --fail --show-error --max-time 180 --retry 2 --retry-delay 15 \
+            -X POST "$APP_URL/api/discover/scan" \
+            -H "X-Cron-Secret: $CRON_SECRET"

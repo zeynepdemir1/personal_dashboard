@@ -77,18 +77,28 @@ Bu proje, Claude Design'da tasarımı tamamlanmış bir kişisel dashboard/blog 
 
 ## Aşama 11 — Program Keşfi (Otomatik Arama)
 **API kararı:** Başlangıçta Brave Search API planlanmıştı ama Zeynep araştırdı: Brave Şubat 2026'dan itibaren yeni kayıtlarda kart bilgisi istiyor ve kredi bitince otomatik ücretlendirmeye geçiyor — gerçek bir ücretsiz katmanı kalmadı. Bunun yerine **SerpApi** kullanılıyor: kart istemeden kayıt, ayda otomatik yenilenen 250 ücretsiz sorgu (`SERPAPI_KEY`, bkz. `.env.example`).
-- [ ] SerpApi ile önceden tanımlanmış anahtar kelime listesiyle (Zeynep'ten alınacak — TÜBİTAK, Teknofest, hackathon, bootcamp, üniversite yarışmaları vb. örnek kategoriler) periyodik tarama
-- [ ] Bulunan sonuçları veritabanında sakla; daha önce görülenleri tekrar gösterme (deduplication)
-- [ ] Kota sınırına yaklaşınca taramayı durdur, bir sonraki periyoda (günlük/haftalık) ertele
-- [ ] Yerel model (Ollama) yeni sonuçları kullanıcının Akademik Gelişim içeriğiyle eşleştirip önem sırasına göre önersin
+
+**Depolama kararı:** Zeynep hosted bir veritabanı istedi. **Upstash Redis** seçildi (REST API, tek URL + token, şema/migration yok — basit bir "görülen id'ler kümesi + sonuç kaydı" ihtiyacı için Supabase'in tam bir Postgres'inden daha hafif). `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` gerekiyor.
+
+**Kota güvenliği:** Kendi sayacımızı tutmak yerine SerpApi'nin kendi `https://serpapi.com/account.json?api_key=...` uç noktası kullanılıyor (`total_searches_left` alanı) — bu çağrı kota TÜKETMİYOR (test edildi), taramadan önce gerçek kalan miktar sorgulanıp güvenlik payı (20) düşülerek o an taranabilecek anahtar kelime sayısı hesaplanıyor. 28 anahtar kelimelik listenin tamamını haftalık taramak (~28 sorgu/hafta, ayda ~112) zaten 250 sorgu/ay kotasının çok altında — pratikte erteleme mekanizması sadece bir güvenlik ağı, normal koşulda hiç tetiklenmemeli.
+
+### Akış (uçtan uca)
+1. **Tarama (GitHub Actions, haftalık, tarayıcı kapalıyken bile çalışır):** `.github/workflows/discover-programs.yml`, `server.js`'teki `CRON_SECRET` korumalı `POST /api/discover/scan` uç noktasını tetikler. Sunucu her anahtar kelime için SerpApi'de arama yapar, sonuçları (başlık/link/özet) Upstash'te `discover:seen` kümesiyle karşılaştırır — daha önce görülmeyen (link'in kısa hash'i id olarak kullanılıyor) her sonuç `discover:items` hash'ine **`özetlenmedi` değil `filtrelenmedi`** durumuyla kaydedilir. **Profil filtresi bu aşamada UYGULANMAZ.**
+2. **Gecikmeli profil filtresi (Aşama 12'deki desenin aynısı):** Uygulama Ollama'nın erişilebilir olduğu bir cihazda açıldığında, `AppState.tsx` bekleyen tüm `filtrelenmedi` sonuçları (`GET /api/discover/pending`) çeker, her birini yerel modele "bu ilan kullanıcının profiliyle (Mekatronik Mühendisliği öğrencisi, Marmara Üniversitesi; ilgi alanları: gömülü sistemler, kontrol sistemleri, OpenCV, TensorFlow Lite, Linux, İHA/drone) alakalı mı" diye sorar (`classifyProgramRelevance`, `src/lib/ollama.ts`). Maden/inşaat/kimya gibi tamamen alakasız dallar elenir (`rejected`), kalanlar `relevant` olarak işaretlenir (`POST /api/discover/mark-filtered`, tek bir istekte toplu gönderilir).
+3. **Telegram bildirimi (anlık DEĞİL, filtreleme tamamlanınca):** `mark-filtered` uç noktası, yeni `relevant` işaretlenen sonuçları tek bir toplu mesajda (başlık + kısa açıklama + link, listelenmiş) Telegram'a gönderir — birden fazla ayrı mesaj yerine tek mesaj (spam olmasın diye).
+4. **Uygulama içi görünüm:** Home sayfasında yeni bir "Keşfedilen Programlar" kartı, `relevant` (ve henüz gizlenmemiş) sonuçları listeler; her birinin yanında "gizle" aksiyonu var (`POST /api/discover/dismiss`).
+
+- [x] SerpApi ile önceden tanımlanmış anahtar kelime listesiyle (Zeynep'ten alındı — hackathon'lar, TÜBİTAK lisans/öğrenci programları, Teknofest yeni kategoriler, staj/mühendislik ilanları; 4 kategori, 28 anahtar kelime, bkz. `server.js` → `DISCOVER_KEYWORDS`) periyodik (haftalık) tarama
+- [x] Bulunan sonuçlar Upstash Redis'te saklanıyor; daha önce görülenler (`discover:seen` kümesi, link hash'i) tekrar gösterilmiyor
+- [x] Kota sınırına yaklaşınca (SerpApi `account.json` üzerinden gerçek zamanlı kontrol) tarama erken durup kalan anahtar kelimeler bir sonraki periyoda kalıyor
+- [x] Profil filtresi Aşama 12'deki gecikmeli kuyruk mantığıyla uygulanıyor — tarama anında DEĞİL, uygulama Ollama'nın erişilebilir olduğu bir cihazda açıldığında; sadece profille alakalı olanlar kullanıcıya gösteriliyor/Telegram'a gidiyor
+- [x] Yeni + alakalı bulunan sonuçlar için Telegram'a tek bir toplu mesaj gönderiliyor (ayrı ayrı spam mesaj değil)
 - [ ] İleride değerlendirilecek: anahtar kelimelerin kullanıcı içeriğinden otomatik çıkarılması (şimdilik kapsam dışı)
 
-### Açık mimari sorusu — kalıcı depolama
-Bu aşama ilk kez gerçek bir "veritabanı" gerektiriyor: tarama periyodik olarak (muhtemelen GitHub Actions ile, Aşama 15'teki Telegram bildirimiyle aynı desen) tarayıcı hiç açık değilken sunucu tarafında tetiklenecek, dedup listesi taramalar arasında kalıcı olmalı. Ama:
-- Uygulamanın tüm verisi bugüne kadar sadece tarayıcının `localStorage`'ında — sunucuda hiç veritabanı yok.
-- Render'ın ücretsiz planında disk kalıcı değil (bkz. Aşama 16 — bu yüzden fotoğraflar için Cloudinary'e geçildi), yani sonuçları sunucunun kendi diskine yazmak güvenilir değil.
-- Ollama'nın önem sırasına göre önerisi sadece Zeynep'in kendi bilgisayarında (Ollama'nın çalıştığı yerde) mümkün — bu yüzden "tarama" (sunucu/bulut tarafı, otomatik) ile "Ollama'nın sıralaması" (yerel, uygulama açıldığında, Aşama 12'deki gecikmeli kuyruk deseniyle aynı mantık) iki ayrı adım olacak.
-- Depolama seçeneği Zeynep ile netleştirilecek (ör. ücretsiz kotalı bir hosted veritabanı mı, git deposunu basit bir JSON "veritabanı" olarak mı kullanmak, yoksa kapsamı daraltıp dedup'ı sadece tarayıcı localStorage'ında mı tutmak — bu sonuncusu sadece uygulama o taramadan sonra açılırsa çalışır, arka planda sürekli doğru dedup garantisi vermez).
+### Teknik notlar
+- `/api/discover/scan` (tarama) `CRON_SECRET` ile korunuyor — sunucudan sunucuya (GitHub Actions) çağrılıyor, Telegram uç noktasıyla aynı desen. `/api/discover/pending`, `/api/discover/mark-filtered`, `/api/discover/relevant`, `/api/discover/dismiss` ise `/api/upload-image` ile aynı kasıtlı sınırlamayı taşıyor: bir paylaşımlı sırla korunmuyorlar çünkü tarayıcı bunlara doğrudan istek atıyor ve istemci JS'ine gömülecek bir sır gerçek koruma sağlamazdı. Tek kullanıcılı, gizli bir URL'de barındığı için kabul edilebilir risk.
+- Upstash Redis, Supabase yerine seçildi çünkü veri modeli basit (bir id kümesi + küçük JSON kayıtlar) — tam bir Postgres şeması/migration'a gerek yoktu, tek URL + token ile REST üzerinden çalışıyor.
+- SerpApi hesabının aylık kullanımını görmek için: `https://serpapi.com/manage-api-key`.
 
 ## Aşama 12 — Gecikmeli Özetleme Kuyruğu ✅
 - [x] Her Bir Şey Öğrendim girişine bir durum alanı ekle: `özetlenmedi` / `özetlendi` — ayrı bir alan yerine mevcut `summary` alanının varlığından türetiliyor (persisted `learnEntries` zaten sadece kullanıcı girişlerini tutuyor, seed girişlerin hepsinde `summary` her zaman dolu — bu yüzden ek/yinelenen bir alan gereksiz olurdu); Learn ekranında özet yoksa küçük bir "özetlenmedi" göstergesi çıkıyor

@@ -243,13 +243,34 @@ export function Home() {
             </div>
           )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8, paddingTop: 16, borderTop: `1px dashed ${colors.borderStrong}` }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8, paddingTop: 16, borderTop: `1px dashed ${colors.borderStrong}` }}>
             <div style={{ fontFamily: fonts.sans, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.inkFaint }}>
-              Önerilen programlar
+              Keşfedilen programlar
             </div>
-            <div style={{ fontSize: 12.5, lineHeight: 1.6, color: colors.inkFaint, fontStyle: 'italic' }}>
-              İçeriğine göre AI önerileri burada listelenecek — henüz hazır değil.
-            </div>
+            {app.discoveredPrograms.length === 0 ? (
+              <div style={{ fontSize: 12.5, lineHeight: 1.6, color: colors.inkFaint, fontStyle: 'italic' }}>
+                Henüz yeni bir şey bulunamadı — periyodik tarama ve yerel modelin profil
+                filtresi tamamlanınca burada listelenecek.
+              </div>
+            ) : (
+              app.discoveredPrograms.map((p) => (
+                <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingBottom: 10, borderBottom: '1px solid #F1E4E4' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+                    <a href={p.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13.5, lineHeight: 1.4 }}>
+                      {p.title}
+                    </a>
+                    <span
+                      onClick={() => app.dismissDiscoveredProgram(p.id)}
+                      className="text-hover-red"
+                      style={{ fontSize: 10.5, color: colors.placeholderText, cursor: 'pointer', flex: '0 0 auto' }}
+                    >
+                      gizle
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12, color: colors.inkSoft, lineHeight: 1.55 }}>{p.snippet}</div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>

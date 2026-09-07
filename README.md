@@ -39,6 +39,15 @@ npm run build
   noktası, GitHub Actions'taki zamanlanmış bir workflow (bkz.
   `.github/workflows/daily-telegram-notify.yml`) tarafından her gün
   tetiklenir ve o günkü yaklaşan programları Telegram'a gönderir.
+- Program Keşfi (Home > "Keşfedilen programlar"): haftalık bir GitHub
+  Actions workflow'u (`discover-programs.yml`) SerpApi ile önceden
+  tanımlanmış anahtar kelimeleri tarar, yeni sonuçları Upstash Redis'e
+  kaydeder. Profil filtresi (alakasız mühendislik dallarını eleme) o anda
+  UYGULANMAZ — uygulama Ollama'nın erişilebilir olduğu bir cihazda
+  açıldığında arka planda otomatik olarak yapılır (Aşama 12'deki
+  gecikmeli özetleme kuyruğuyla aynı desen); alakalı bulunan yeni sonuçlar
+  hem uygulamada listelenir hem de tek bir toplu Telegram mesajıyla
+  bildirilir.
 
 ## Yayına alma (deployment)
 
@@ -67,7 +76,10 @@ Start command: npm start
 | `CLOUDINARY_API_SECRET`  | Hayır*     | Cloudinary Dashboard'dan alınır — asla istemciye gönderilmez, sadece sunucu tarafında kullanılır. |
 | `TELEGRAM_BOT_TOKEN`     | Hayır*     | @BotFather ile oluşturulan bot token'ı. Günlük Telegram bildirimi için gerekli. |
 | `TELEGRAM_CHAT_ID`       | Hayır*     | Bildirimin gideceği sohbetin kimliği. |
-| `CRON_SECRET`            | Hayır*     | `/api/notify/daily` uç noktasını dışarıdan (GitHub Actions) tetiklerken kullanılan paylaşılan sır; GitHub repo secrets'a da aynısı eklenmeli. |
+| `CRON_SECRET`            | Hayır*     | `/api/notify/daily` VE `/api/discover/scan` uç noktalarını dışarıdan (GitHub Actions) tetiklerken kullanılan paylaşılan sır; GitHub repo secrets'a da aynısı eklenmeli. |
+| `SERPAPI_KEY`            | Hayır*     | [serpapi.com](https://serpapi.com) — Program Keşfi taraması için. Ayda 250 ücretsiz sorgu. |
+| `UPSTASH_REDIS_REST_URL` | Hayır*     | [upstash.com](https://upstash.com) — Program Keşfi'nin kalıcı deposu (Redis, REST API). |
+| `UPSTASH_REDIS_REST_TOKEN` | Hayır*   | Upstash Dashboard > REST API'den alınır. |
 
 \* Uygulamanın temel işlevleri için zorunlu değil, ama ilgili özellik
 (fotoğraf yükleme / Telegram bildirimi) bu değişkenler olmadan çalışmaz.

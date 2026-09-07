@@ -14,6 +14,7 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { v2 as cloudinary } from 'cloudinary';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -55,6 +56,14 @@ if (CLOUDINARY_CONFIGURED) {
   });
 } else {
   console.warn('[server] Cloudinary ortam değişkenleri eksik — fotoğraf yükleme devre dışı kalacak.');
+}
+
+const SERPAPI_KEY = process.env.SERPAPI_KEY;
+const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const DISCOVER_CONFIGURED = !!(SERPAPI_KEY && UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN);
+if (!DISCOVER_CONFIGURED) {
+  console.warn('[server] SerpApi/Upstash ortam değişkenleri eksik — Program Keşfi devre dışı kalacak.');
 }
 
 const app = express();
@@ -199,6 +208,239 @@ app.post('/api/notify/daily', express.json(), async (req, res) => {
   } catch (err) {
     console.error('[server] Telegram bildirimi gönderilemedi:', err);
     res.status(502).json({ error: 'telegram send failed' });
+  }
+});
+
+// Program Keşfi — Otomatik Arama (bkz. PLAN.md Aşama 11). GitHub
+// Actions'taki haftalık bir workflow (bkz.
+// .github/workflows/discover-programs.yml) CRON_SECRET korumalı
+// /api/discover/scan uç noktasını tetikler; sunucu her anahtar kelime
+// için SerpApi'de arama yapar, daha önce görülmeyen sonuçları Upstash
+// Redis'e "filtrelenmedi" durumuyla kaydeder. Profil filtresi (Ollama)
+// BURADA UYGULANMAZ — Aşama 12'deki gecikmeli özetleme kuyruğuyla aynı
+// mantıkla, uygulama Ollama'nın erişilebilir olduğu bir cihazda
+// açıldığında istemci tarafında yapılır (bkz. AppState.tsx,
+// classifyProgramRelevance). Bu yüzden Telegram bildirimi de tarama
+// anında değil, filtreleme tamamlanınca (mark-filtered uç noktasından)
+// gönderiliyor.
+const DISCOVER_KEYWORDS = [
+  // 1. Hackathon'lar (resmi/kurumsal kaynaklı)
+  { keyword: 'TÜBİTAK hackathon', category: 'hackathon' },
+  { keyword: 'T3 Vakfı hackathon', category: 'hackathon' },
+  { keyword: 'T3 AI Creathon', category: 'hackathon' },
+  { keyword: 'Sanayi Bakanlığı hackathon', category: 'hackathon' },
+  { keyword: 'Ulaştırma Bakanlığı hackathon', category: 'hackathon' },
+  { keyword: 'kamu hackathon Türkiye', category: 'hackathon' },
+  { keyword: 'üniversite hackathon mühendislik 2026', category: 'hackathon' },
+  { keyword: 'Deneyap hackathon', category: 'hackathon' },
+  // 2. TÜBİTAK lisans/öğrenci programları
+  { keyword: 'TÜBİTAK 2209-A', category: 'tubitak' },
+  { keyword: 'TÜBİTAK 2209-B', category: 'tubitak' },
+  { keyword: 'TÜBİTAK STAR programı', category: 'tubitak' },
+  { keyword: 'TÜBİTAK 2242', category: 'tubitak' },
+  { keyword: 'TÜBİTAK lisans araştırma projesi başvuru', category: 'tubitak' },
+  { keyword: 'TÜBİTAK öğrenci proje yarışması 2026/2027', category: 'tubitak' },
+  // 3. Teknofest — yeni kategoriler
+  { keyword: 'Teknofest yeni kategori 2027', category: 'teknofest' },
+  { keyword: 'Teknofest başvuru kategorileri', category: 'teknofest' },
+  { keyword: 'Teknofest kontrol otomasyon', category: 'teknofest' },
+  { keyword: 'Teknofest insansız hava aracı', category: 'teknofest' },
+  { keyword: 'Teknofest robot yarışması', category: 'teknofest' },
+  { keyword: 'Teknofest yapay zeka yarışması', category: 'teknofest' },
+  // 4. Staj/mühendislik ilanları (profil filtreli — gecikmeli kuyrukta elenir)
+  { keyword: 'mekatronik mühendisliği stajyer ilanı', category: 'staj' },
+  { keyword: 'gömülü sistemler stajyer 3. sınıf', category: 'staj' },
+  { keyword: 'kontrol sistemleri stajyer mühendis', category: 'staj' },
+  { keyword: 'elektrik elektronik mühendisliği stajyer ilanı Türkiye', category: 'staj' },
+  { keyword: 'robotik/otomasyon stajyer öğrenci', category: 'staj' },
+  { keyword: 'Baykar stajyer mühendis', category: 'staj' },
+  { keyword: 'ASELSAN stajyer mühendis', category: 'staj' },
+  { keyword: 'TÜBİTAK SAGE/BİLGEM stajyer', category: 'staj' },
+];
+
+const SERPAPI_QUOTA_BUFFER = 20; // bu kadar sorgu kalınca tarama erken durur
+
+async function redis(...args) {
+  const res = await fetch(UPSTASH_REDIS_REST_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${UPSTASH_REDIS_REST_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+    signal: AbortSignal.timeout(10000),
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(`Upstash hatası: ${data.error || res.status}`);
+  return data.result;
+}
+
+async function redisHGetAll(key) {
+  const flat = (await redis('HGETALL', key)) || [];
+  const items = [];
+  for (let i = 0; i < flat.length; i += 2) {
+    try {
+      items.push(JSON.parse(flat[i + 1]));
+    } catch {
+      // bozuk bir kayıt varsa atla, tüm listeyi çökertmesin
+    }
+  }
+  return items;
+}
+
+function programId(link) {
+  return createHash('sha1').update(link).digest('hex').slice(0, 16);
+}
+
+async function serpapiRemainingSearches() {
+  const res = await fetch(`https://serpapi.com/account.json?api_key=${SERPAPI_KEY}`, { signal: AbortSignal.timeout(10000) });
+  if (!res.ok) throw new Error(`SerpApi account.json ${res.status}`);
+  const data = await res.json();
+  return typeof data.total_searches_left === 'number' ? data.total_searches_left : 0;
+}
+
+async function serpapiSearch(keyword) {
+  const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(keyword)}&num=5&hl=tr&gl=tr&api_key=${SERPAPI_KEY}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`SerpApi search.json ${res.status}`);
+  const data = await res.json();
+  return Array.isArray(data.organic_results) ? data.organic_results : [];
+}
+
+app.post('/api/discover/scan', express.json(), async (req, res) => {
+  if (!CRON_SECRET || req.get('X-Cron-Secret') !== CRON_SECRET) {
+    res.status(401).json({ error: 'unauthorized' });
+    return;
+  }
+  if (!DISCOVER_CONFIGURED) {
+    res.status(503).json({ error: 'discovery not configured' });
+    return;
+  }
+  try {
+    let remaining = await serpapiRemainingSearches();
+    let keywordsScanned = 0;
+    let newItems = 0;
+    for (const { keyword, category } of DISCOVER_KEYWORDS) {
+      if (remaining <= SERPAPI_QUOTA_BUFFER) break;
+      const results = await serpapiSearch(keyword);
+      remaining -= 1;
+      keywordsScanned += 1;
+      for (const r of results) {
+        if (!r.link || !r.title) continue;
+        const id = programId(r.link);
+        const seen = await redis('SISMEMBER', 'discover:seen', id);
+        if (seen) continue;
+        await redis('SADD', 'discover:seen', id);
+        await redis('HSET', 'discover:items', id, JSON.stringify({
+          id,
+          title: r.title,
+          link: r.link,
+          snippet: r.snippet || '',
+          keyword,
+          category,
+          foundAt: new Date().toISOString(),
+          status: 'unfiltered',
+        }));
+        newItems += 1;
+      }
+    }
+    res.json({ ok: true, keywordsScanned, newItems, deferred: keywordsScanned < DISCOVER_KEYWORDS.length });
+  } catch (err) {
+    console.error('[server] Program Keşfi taraması başarısız:', err);
+    res.status(502).json({ error: 'scan failed' });
+  }
+});
+
+app.get('/api/discover/pending', async (_req, res) => {
+  if (!DISCOVER_CONFIGURED) {
+    res.status(503).json({ error: 'discovery not configured' });
+    return;
+  }
+  try {
+    const items = await redisHGetAll('discover:items');
+    res.json({ items: items.filter((it) => it.status === 'unfiltered') });
+  } catch (err) {
+    console.error('[server] Bekleyen keşif sonuçları okunamadı:', err);
+    res.status(502).json({ error: 'read failed' });
+  }
+});
+
+app.get('/api/discover/relevant', async (_req, res) => {
+  if (!DISCOVER_CONFIGURED) {
+    res.status(503).json({ error: 'discovery not configured' });
+    return;
+  }
+  try {
+    const items = await redisHGetAll('discover:items');
+    const relevant = items
+      .filter((it) => it.status === 'relevant' && !it.dismissed)
+      .sort((a, b) => (a.foundAt < b.foundAt ? 1 : -1));
+    res.json({ items: relevant });
+  } catch (err) {
+    console.error('[server] Alakalı keşif sonuçları okunamadı:', err);
+    res.status(502).json({ error: 'read failed' });
+  }
+});
+
+app.post('/api/discover/mark-filtered', express.json({ limit: '1mb' }), async (req, res) => {
+  if (!DISCOVER_CONFIGURED) {
+    res.status(503).json({ error: 'discovery not configured' });
+    return;
+  }
+  const results = Array.isArray(req.body?.results) ? req.body.results : [];
+  if (results.length === 0) {
+    res.json({ ok: true, marked: 0, notified: 0 });
+    return;
+  }
+  try {
+    const toNotify = [];
+    for (const { id, relevant } of results) {
+      if (typeof id !== 'string') continue;
+      const raw = await redis('HGET', 'discover:items', id);
+      if (!raw) continue;
+      const item = JSON.parse(raw);
+      if (item.status !== 'unfiltered') continue; // zaten işlenmiş, tekrar bildirim gitmesin
+      item.status = relevant ? 'relevant' : 'rejected';
+      item.filteredAt = new Date().toISOString();
+      await redis('HSET', 'discover:items', id, JSON.stringify(item));
+      if (relevant) toNotify.push(item);
+    }
+    if (toNotify.length > 0 && TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+      const lines = [`🔎 ${toNotify.length} yeni ilgili program/ilan bulundu:`, ''];
+      for (const it of toNotify) {
+        lines.push(`• ${it.title}\n  ${it.snippet}\n  ${it.link}`);
+      }
+      try {
+        await sendTelegramMessage(lines.join('\n\n'));
+      } catch (err) {
+        console.error('[server] Program Keşfi Telegram bildirimi gönderilemedi:', err);
+      }
+    }
+    res.json({ ok: true, marked: results.length, notified: toNotify.length });
+  } catch (err) {
+    console.error('[server] Filtreleme sonuçları işlenemedi:', err);
+    res.status(502).json({ error: 'mark failed' });
+  }
+});
+
+app.post('/api/discover/dismiss', express.json(), async (req, res) => {
+  if (!DISCOVER_CONFIGURED) {
+    res.status(503).json({ error: 'discovery not configured' });
+    return;
+  }
+  const id = req.body?.id;
+  if (typeof id !== 'string') {
+    res.status(400).json({ error: 'invalid id' });
+    return;
+  }
+  try {
+    const raw = await redis('HGET', 'discover:items', id);
+    if (raw) {
+      const item = JSON.parse(raw);
+      item.dismissed = true;
+      await redis('HSET', 'discover:items', id, JSON.stringify(item));
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[server] Keşif sonucu gizlenemedi:', err);
+    res.status(502).json({ error: 'dismiss failed' });
   }
 });
 
