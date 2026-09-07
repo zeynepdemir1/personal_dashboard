@@ -105,6 +105,45 @@ Aşama 11 (Program Keşfi) ile birlikte, ikisi de şimdilik plana not edildi —
 - Gerçek Express sunucusuyla yerelde uçtan uca test edildi: statik site 200, `/api/calendar.ics` gerçek takvim verisini döndü, `/api/ollama/*` ve tanımsız `/api/*` yolları 404, bilinmeyen normal yollar `index.html`'e düşüyor (hash routing kullanıldığı için zaten gerekmiyor ama güvenlik ağı olarak duruyor).
 - Express 5 kullanılıyor — bare `'*'` joker artık geçersiz, `'/*splat'` gerekiyor (bu proje için düzeltildi, ileride Express güncellenirse akılda tutulmalı).
 
+### Canlı ortam
+- Uygulama Render'da canlı: `personal-dashboard-pb7t.onrender.com`.
+- Özel domain `zdemir.tech` DNS doğrulama sürecinde.
+
+## Aşama 15 — Yayın Sonrası Düzeltmeler
+**Sıra dışı çalışılıyor:** Aşama 11 ve 12'den önce, hemen ele alınacak — Zeynep canlı sitede test ederken bulundu. Bitince onay alınıp **Aşama 12'ye (Gecikmeli Özetleme Kuyruğu)** geçilecek; Aşama 11 (Program Keşfi) ve 14 daha sonraya kalıyor.
+
+### 1. Fotoğraf yükleme hatası
+- [x] Proje Fikirleri ve Merak Konuları kartlarına eklenen fotoğrafların açılmama/görüntülenmeme sorununu incele ve düzelt — kök neden: sıkıştırılmamış telefon fotoğrafları localStorage kotasını doldurup `setItem`'ı sessizce başarısız kılıyordu; `compressImage()` (canvas tabanlı, `src/lib/image.ts`) ile çözüldü, ayrıca kota hatasında görselleri çıkarıp yeniden deneyen bir yedek mekanizma eklendi
+
+### 2. Proje Fikirleri detay sayfası
+- [x] Her proje fikri kendi sayfasına/görünümüne açılabilsin: başlık, metin, fotoğraf, checklist (alt görevler), durum güncelleme alanı (planlandı/devam ediyor/tamamlandı) — `entry` route state `number | null` oldu (liste/detay ayrımı için), `src/lib/projects.ts`'te görünüm modeli, `Projects.tsx`'te liste+detay ekranı, tarayıcıda test edildi (durum değişimi, checklist ekle/işaretle, not düzenleme, sayfa yenilemede kalıcılık — hepsi doğrulandı)
+
+### 3. Linkler ↔ Merak Konuları bağlantısı
+- [x] Bir merak konusuna bir/birden fazla link eklenebilsin (başlığıyla birlikte); konu görünümünde listelensin ve tıklanabilsin
+
+### 4. Yaklaşan Programlar zenginleştirme
+- [x] Her programa not, link ve dosya (ör. şartname PDF'i) eklenebilsin — dosya boyutu 3MB ile sınırlandı
+
+### 5. Takvim düzeltmeleri ve Telegram bildirimi
+- [x] "+ Not / ders ekle" butonunu çalışır hale getir (gerçekten not/ders eklenebilsin)
+- [x] Telegram bot entegrasyonu: günlük olarak o günün programını (dersler, notlar, yaklaşan program hatırlatmaları) Telegram bildirimi olarak gönder — `server.js`'te `/api/notify/daily` (paylaşılan sır ile korunmalı), GitHub Actions ile her gün 08:00 TR saatinde dışarıdan tetikleniyor (`.github/workflows/daily-telegram-notify.yml`); gerçek bot token/chat ID ile uçtan uca test edildi, gerçek bir Telegram mesajı gönderildi
+- [x] Google Calendar'a geri yazma (iki yönlü senkronizasyon) YOK — sadece okuma yönü (mevcut iCal) kalacak, bildirimler Telegram üzerinden
+- **Önemli kısıtlama:** Sunucunun kullanıcının kişisel localStorage verisine (kendi eklediği gün notları/programları) erişimi yok — bu yüzden Telegram bildirimi sadece statik `PROGRAMS` listesindeki hatırlatmaları raporlayabiliyor, kullanıcının kendi eklediklerini değil. Gerçek çözüm sunucu taraflı bir veri deposu gerektirir; şimdilik bu sınırlamayla yayınlandı.
+- **Zeynep'in yapması gerekenler:** (1) Render production ortam değişkenlerine `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `CRON_SECRET`, `GCAL_ICS_URL` eklenmeli (şimdilik sadece `.env.local`'de var). (2) GitHub repo secrets'a (Settings → Secrets and variables → Actions) `CRON_SECRET` ve `APP_URL` eklenmeli, yoksa workflow çalışmaz.
+
+### 6. Şiir ve Günlük CRUD
+- [x] Şiir: yeni ekleme, güncelleme, silme
+- [x] Günlük: yeni ekleme, güncelleme, silme — **şifreleme/gerçek kimlik doğrulamaya DOKUNULMADI**, ayrı bir bütünsel güvenlik aşamasında ele alınacak, şimdilik sade CRUD yeterli
+- [x] Geri tuşuna basınca günlüğün tekrar kilitlenmediği hatası düzeltildi — `unlocked` artık kalıcı değil, ekran `diary`'den çıkınca otomatik kilitleniyor
+
+### 7. Profil ve kimlik bilgileri
+- [x] Placeholder isim ("Deniz Arslan") yerine gerçek isim ("Hatice Zeynep Demir") her yerde
+- [x] Ana sayfadaki tarih statik kalmış — sadece karşılama başlığı dinamik/güncel tarihi gösteriyor (Zeynep'in tercihiyle: takvim, istatistikler ve Google Calendar senkron aralığı sabit referans tarihte — 31 Ağustos 2026 — kalıyor)
+- [x] Profil düzenleme ekranı (kullanıcının adını değiştirebileceği bir arayüz) — **not:** ilerleyen bir aşamada daha da geliştirilebilir (fotoğraf, unvan vb.)
+- [x] Çoklu kullanıcı/hesap ekleme özelliğini tamamen kaldırıldı — tek profilli yapıya sadeleştirildi
+
+**Aşama 15 tamamlandı.** Aşama 12'ye (Gecikmeli Özetleme Kuyruğu) geçmeden önce Zeynep'in onayı bekleniyor.
+
 ## Aşama 14 — Test ve Yayına Hazırlık
 - [ ] Tüm modüllerde hover/tıklanabilirlik göstergelerinin (pointer cursor) tutarlı çalıştığını doğrula
 - [ ] GitHub'a düzenli commit/push

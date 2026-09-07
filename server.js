@@ -38,6 +38,9 @@ loadLocalEnvFile();
 
 const PORT = process.env.PORT || 3000;
 const GCAL_ICS_URL = process.env.GCAL_ICS_URL;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const CRON_SECRET = process.env.CRON_SECRET;
 
 const app = express();
 
@@ -58,6 +61,88 @@ if (GCAL_ICS_URL) {
 } else {
   console.warn('[server] GCAL_ICS_URL tanımlı değil — Google Calendar senkronizasyonu devre dışı kalacak.');
 }
+
+// Günlük Telegram bildirimi (bkz. PLAN.md Aşama 15, madde 5) — GitHub
+// Actions'taki zamanlanmış bir workflow bu uç noktayı her gün tetikler
+// (bkz. .github/workflows/daily-telegram-notify.yml). Paylaşımlı bir sır
+// (CRON_SECRET) ile korunuyor; doğru başlık olmadan istek 401 alır.
+//
+// ÖNEMLİ SINIRLAMA: Uygulamanın TÜM kişisel verisi (eklediğin dersler/
+// notlar, program eklemeleri) yalnızca tarayıcının localStorage'ında
+// yaşıyor — sunucunun buna hiçbir erişimi yok. Bu yüzden bildirim şu an
+// SADECE statik "Yaklaşan Programlar" listesindeki (data.ts → PROGRAMS)
+// gerçek tarihli hatırlatmaları, GERÇEK bugünün tarihine göre raporluyor.
+// Kendi eklediğin ders notların bu bildirime giremiyor — bunun için
+// gerçek bir sunucu tarafı veritabanı gerekir (şimdilik kapsam dışı).
+const UPCOMING_PROGRAMS = [
+  { date: '15.09.2026', title: 'TÜBİTAK 2209-A · 2. dönem son başvuru', note: 'Proje önerisi, bütçe tablosu, danışman onayı' },
+  { date: '02.10.2026', title: 'TEKNOFEST takım başvurusu', note: 'Kontrol ve otomasyon kategorisi' },
+  { date: '20.11.2026', title: 'IEEE öğrenci sempozyumu · özet', note: '250 kelime özet, poster opsiyonel' },
+  { date: '10.01.2027', title: 'TÜBİTAK 2242 lise/lisans yarışması', note: 'Ön kayıt açılışı' },
+  { date: '01.03.2027', title: 'Erasmus+ staj başvuru dönemi', note: 'Dil belgesi ve transkript hazır olmalı' },
+];
+
+function parseDDMMYYYY(s) {
+  const [d, m, y] = s.split('.').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function daysLeftReal(dateStr) {
+  const target = parseDDMMYYYY(dateStr);
+  const today = new Date();
+  const a = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const b = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
+function buildDailyMessage() {
+  const upcoming = UPCOMING_PROGRAMS.map((p) => ({ ...p, left: daysLeftReal(p.date) }))
+    .filter((p) => p.left >= 0)
+    .sort((a, b) => a.left - b.left);
+
+  const todayStr = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' });
+  const lines = [`📅 ${todayStr}`, ''];
+
+  if (upcoming.length === 0) {
+    lines.push('Yaklaşan bir program hatırlatması yok.');
+  } else {
+    lines.push('Yaklaşan programlar:');
+    for (const p of upcoming.slice(0, 5)) {
+      const leftText = p.left === 0 ? 'bugün' : `${p.left} gün kaldı`;
+      lines.push(`• ${p.title} — ${leftText}\n  ${p.note}`);
+    }
+  }
+  return lines.join('\n');
+}
+
+async function sendTelegramMessage(text) {
+  const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`Telegram API ${res.status}`);
+}
+
+app.post('/api/notify/daily', express.json(), async (req, res) => {
+  if (!CRON_SECRET || req.get('X-Cron-Secret') !== CRON_SECRET) {
+    res.status(401).json({ error: 'unauthorized' });
+    return;
+  }
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    res.status(503).json({ error: 'telegram not configured' });
+    return;
+  }
+  try {
+    const message = buildDailyMessage();
+    await sendTelegramMessage(message);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[server] Telegram bildirimi gönderilemedi:', err);
+    res.status(502).json({ error: 'telegram send failed' });
+  }
+});
 
 app.use(express.static(path.join(__dirname, 'dist')));
 

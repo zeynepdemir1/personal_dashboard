@@ -1,6 +1,7 @@
 import { useApp } from '../state/AppState';
 import { colors, fonts, navItemStyle } from '../lib/theme';
 import { useOllamaStatus } from '../lib/ollama';
+import { initials } from '../lib/profile';
 import type { Screen } from '../lib/types';
 
 const ACADEMIC: { key: Screen; label: string }[] = [
@@ -12,9 +13,9 @@ const ACADEMIC: { key: Screen; label: string }[] = [
   { key: 'topics', label: 'Araştırılacak Konular' },
 ];
 
-const PERSONAL: { key: Screen; label: string; count: string }[] = [
-  { key: 'diary', label: 'Günlük', count: '·' },
-  { key: 'poems', label: 'Şiir', count: '9' },
+const PERSONAL: { key: Screen; label: string }[] = [
+  { key: 'diary', label: 'Günlük' },
+  { key: 'poems', label: 'Şiir' },
 ];
 
 export function Sidebar() {
@@ -29,6 +30,8 @@ export function Sidebar() {
     projects: String(12 + app.extraProjects.length),
     calendar: String(7 + app.extraPrograms.length),
     topics: String(23 + app.extraTopics.length),
+    diary: '·',
+    poems: String(app.poemEntries.length),
   };
 
   return (
@@ -123,7 +126,7 @@ export function Sidebar() {
             style={navItemStyle(app.screen === item.key)}
           >
             <span>{item.label}</span>
-            <span style={{ fontFamily: fonts.sans, fontSize: 11, color: colors.inkFainter }}>{item.count}</span>
+            <span style={{ fontFamily: fonts.sans, fontSize: 11, color: colors.inkFainter }}>{counts[item.key]}</span>
           </div>
         ))}
       </nav>
@@ -166,10 +169,10 @@ export function Sidebar() {
               flex: '0 0 38px',
             }}
           >
-            DA
+            {initials(app.profileName)}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: fonts.serif, fontSize: 15.5, lineHeight: 1.2 }}>Deniz Arslan</div>
+            <div style={{ fontFamily: fonts.serif, fontSize: 15.5, lineHeight: 1.2 }}>{app.profileName}</div>
             <div
               style={{
                 display: 'flex',
@@ -196,7 +199,7 @@ export function Sidebar() {
           <span style={{ marginLeft: 'auto', fontSize: 13, color: colors.inkFaint }}>⋯</span>
         </div>
 
-        {app.profileOpen && (
+        {app.profileOpen && !app.editingProfile && (
           <div
             style={{
               display: 'flex',
@@ -207,12 +210,52 @@ export function Sidebar() {
               color: colors.inkSoft,
             }}
           >
-            <span className="text-hover-rose" style={{ cursor: 'pointer' }}>
+            <span onClick={app.startEditProfile} className="text-hover-rose" style={{ cursor: 'pointer' }}>
               Profili düzenle
             </span>
-            <span className="text-hover-rose" style={{ cursor: 'pointer' }}>
-              Hesap ekle
-            </span>
+          </div>
+        )}
+
+        {app.editingProfile && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              padding: '4px 8px 2px',
+            }}
+          >
+            <input
+              value={app.qProfileName}
+              onChange={(e) => app.setQProfileName(e.target.value)}
+              placeholder="Ad Soyad"
+              style={{
+                padding: '7px 9px',
+                border: `1px solid ${colors.borderStrong}`,
+                background: colors.panel,
+                fontFamily: fonts.sans,
+                fontSize: 12.5,
+                color: colors.ink,
+                outline: 'none',
+                borderRadius: 3,
+              }}
+            />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <div
+                onClick={app.cancelEditProfile}
+                className="btn-outline-hover"
+                style={{ flex: 1, padding: '6px 0', textAlign: 'center', border: `1px solid ${colors.borderStrong}`, color: colors.inkSoft, fontSize: 12, cursor: 'pointer', borderRadius: 3 }}
+              >
+                Vazgeç
+              </div>
+              <div
+                onClick={app.saveProfileName}
+                className="btn-dark"
+                style={{ flex: 1, padding: '6px 0', textAlign: 'center', fontSize: 12, cursor: 'pointer', borderRadius: 3 }}
+              >
+                Kaydet
+              </div>
+            </div>
           </div>
         )}
       </div>

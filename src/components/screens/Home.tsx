@@ -1,20 +1,14 @@
 import { useRef, type ChangeEvent, type CSSProperties } from 'react';
 import { useApp } from '../../state/AppState';
 import { colors, fonts, pillStyle, dayBlockStyle, gcalBlockStyle, HOUR_ROW_HEIGHT } from '../../lib/theme';
-import { LINKS, PROGRAMS, PROJECTS, TOPICS, TODAY, AUG31_BLOCKS, timeToHour } from '../../lib/data';
+import { LINKS, PROGRAMS, TOPICS, AUG31_BLOCKS, timeToHour } from '../../lib/data';
 import { computeHomeStats, computeClosedTopicsThisMonth } from '../../lib/stats';
 import { daysLeftUntil, daysLeftColor, formatDaysLeft, formatMonthDay, parseDotDate } from '../../lib/dates';
 import { SEED_LEARN_ENTRIES } from '../../lib/learn';
 import { eventsOnDate } from '../../lib/googleCalendar';
-
-function readImageAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
+import { compressImage } from '../../lib/image';
+import { formatHeaderDate, greetingName, greetingWord } from '../../lib/profile';
+import { buildProjectViews } from '../../lib/projects';
 
 const HOUR_LABELS = [
   '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
@@ -39,6 +33,10 @@ export function Home() {
   const w = app.width;
   const narrow = w < 1180;
   const tight = w < 860;
+  // Sadece karşılama başlığı gerçek/dinamik tarihi gösteriyor — takvim
+  // ızgarası, istatistik hesapları ve Google Calendar aralığı bilerek
+  // sabit referans tarihte kalıyor (Zeynep'in kararı, bkz. PLAN.md Aşama 15).
+  const now = new Date();
 
   const gridHome: CSSProperties = narrow
     ? { display: 'grid', gridTemplateColumns: '1fr', gap: 48 }
@@ -85,7 +83,7 @@ export function Home() {
   // kopyalanmış bir liste yok, sadece en yakın 3 tanesi gösteriliyor.
   const allPrograms = [
     ...PROGRAMS,
-    ...app.extraPrograms.map((p) => ({ date: TODAY, title: p, note: 'Az önce eklendi' })),
+    ...app.extraPrograms.map((p) => ({ date: p.date, title: p.title, note: p.note || 'Ana sayfadan eklendi' })),
   ];
   const upcoming = allPrograms
     .map((p) => ({ ...p, daysLeft: daysLeftUntil(p.date) }))
@@ -128,10 +126,8 @@ export function Home() {
     kind: l.kind || 'Link',
     open: () => app.openLinkMenu(l.title, l.url),
   }));
-  const homeProjects = [
-    ...app.extraProjects.map((p) => ({ title: p.title, state: p.state, stateColor: p.stateColor, image: p.image })),
-    ...PROJECTS.map((p) => ({ title: p.title, state: p.state, stateColor: p.stateColor, image: undefined as string | undefined })),
-  ].slice(0, 3);
+  const homeProjectViews = buildProjectViews(app.extraProjects, app.projectOverrides);
+  const homeProjects = homeProjectViews.slice(0, 3);
 
   const topicFileRef = useRef<HTMLInputElement>(null);
   const projectFileRef = useRef<HTMLInputElement>(null);
@@ -140,23 +136,23 @@ export function Home() {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    app.addTopic(await readImageAsDataUrl(file));
+    app.addTopic(await compressImage(file));
   };
   const handleProjectPhoto = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    app.addProject(await readImageAsDataUrl(file));
+    app.addProject(await compressImage(file));
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 48 }}>
       <header style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ fontFamily: fonts.sans, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: colors.inkFainter }}>
-          31 Ağustos 2026 · Pazartesi
+          {formatHeaderDate(now)}
         </div>
         <h1 style={{ margin: 0, fontFamily: fonts.serif, fontSize: 46, lineHeight: 1.1, fontWeight: 400, letterSpacing: '-0.02em', maxWidth: '20ch', color: colors.ink }}>
-          İyi akşamlar, Deniz.
+          {greetingWord(now)}, {greetingName(app.profileName)}.
         </h1>
         <p style={{ margin: 0, maxWidth: '54ch', fontSize: 15, lineHeight: 1.65, color: colors.inkSoft, textWrap: 'pretty' }}>
           {homeStats.currentMonthLabel} ayında{' '}
@@ -308,8 +304,13 @@ export function Home() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, border: `1px solid ${colors.border}`, background: colors.panel, padding: '20px 20px 18px', borderRadius: 4 }}>
           <h2 style={{ margin: 0, fontFamily: fonts.serif, fontSize: 17, fontWeight: 500, color: colors.ink }}>Proje fikirleri</h2>
-          {homeProjects.map((p, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '3px 0' }}>
+          {homeProjects.map((p) => (
+            <div
+              key={p.key}
+              onClick={() => app.navigate('projects', homeProjectViews.indexOf(p))}
+              className="hover-row-alt"
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '3px 0', cursor: 'pointer', borderRadius: 3 }}
+            >
               {p.image && (
                 <img
                   src={p.image}
@@ -377,7 +378,14 @@ export function Home() {
                   ? 'Google Calendar senkronizasyonu başarısız'
                   : 'Google Calendar bağlı değil'}
             </span>
-            <span className="hover-underline" style={{ fontFamily: fonts.sans, fontSize: 11, color: colors.rose, cursor: 'pointer', borderBottom: '1px solid transparent', paddingBottom: 1 }}>
+            <span
+              onClick={() => {
+                const realDay = now.getDate();
+                app.openDayPanel(realDay >= 1 && realDay <= 30 ? realDay : 1);
+              }}
+              className="hover-underline"
+              style={{ fontFamily: fonts.sans, fontSize: 11, color: colors.rose, cursor: 'pointer', borderBottom: '1px solid transparent', paddingBottom: 1 }}
+            >
               + Not / ders ekle
             </span>
           </div>

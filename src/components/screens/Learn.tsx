@@ -9,7 +9,7 @@ export function Learn() {
   const tight = app.width < 860;
 
   const entries = [...app.learnEntries, ...SEED_LEARN_ENTRIES];
-  const activeIndex = Math.min(app.entry, entries.length - 1);
+  const activeIndex = Math.min(app.entry ?? 0, entries.length - 1);
   const article = entries[activeIndex];
 
   const gridLearn: CSSProperties = narrow

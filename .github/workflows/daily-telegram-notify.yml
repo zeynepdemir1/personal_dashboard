@@ -1,0 +1,23 @@
+name: Günlük Telegram bildirimi
+
+on:
+  schedule:
+    # 08:00 Türkiye saati (UTC+3, yaz saati uygulaması yok) = 05:00 UTC
+    - cron: '0 5 * * *'
+  workflow_dispatch: {} # elle test tetiklemek için
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Uygulamadaki günlük bildirim uç noktasını tetikle
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          # Render'ın ücretsiz planı boşta kalınca uyur; ilk istek onu
+          # uyandırabilir ve yanıt gecikebilir — yüksek timeout + birkaç
+          # deneme bu yüzden gerekli.
+          curl --fail --show-error --max-time 90 --retry 2 --retry-delay 15 \
+            -X POST "$APP_URL/api/notify/daily" \
+            -H "X-Cron-Secret: $CRON_SECRET"
