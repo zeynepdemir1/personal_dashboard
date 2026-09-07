@@ -313,17 +313,35 @@ app.post('/api/discover/scan', express.json(), async (req, res) => {
     res.status(503).json({ error: 'discovery not configured' });
     return;
   }
+  let remaining;
   try {
-    let remaining = await serpapiRemainingSearches();
-    let keywordsScanned = 0;
-    let newItems = 0;
-    for (const { keyword, category } of DISCOVER_KEYWORDS) {
-      if (remaining <= SERPAPI_QUOTA_BUFFER) break;
-      const results = await serpapiSearch(keyword);
+    remaining = await serpapiRemainingSearches();
+  } catch (err) {
+    console.error('[server] SerpApi kota kontrolü başarısız:', err);
+    res.status(502).json({ error: 'quota check failed' });
+    return;
+  }
+  let keywordsScanned = 0;
+  let newItems = 0;
+  let errors = 0;
+  for (const { keyword, category } of DISCOVER_KEYWORDS) {
+    if (remaining <= SERPAPI_QUOTA_BUFFER) break;
+    // Tek bir anahtar kelimenin veya tek bir Redis çağrısının başarısız
+    // olması (ör. geçici bir ağ zaman aşımı) tüm taramayı iptal etmesin —
+    // o kelimeyi/sonucu atlayıp devam et, kalan kelimeler yine de taransın.
+    let results;
+    try {
+      results = await serpapiSearch(keyword);
       remaining -= 1;
       keywordsScanned += 1;
-      for (const r of results) {
-        if (!r.link || !r.title) continue;
+    } catch (err) {
+      console.error(`[server] SerpApi araması başarısız (${keyword}):`, err);
+      errors += 1;
+      continue;
+    }
+    for (const r of results) {
+      if (!r.link || !r.title) continue;
+      try {
         const id = programId(r.link);
         const seen = await redis('SISMEMBER', 'discover:seen', id);
         if (seen) continue;
@@ -339,13 +357,13 @@ app.post('/api/discover/scan', express.json(), async (req, res) => {
           status: 'unfiltered',
         }));
         newItems += 1;
+      } catch (err) {
+        console.error(`[server] Upstash yazma hatası (${r.link}):`, err);
+        errors += 1;
       }
     }
-    res.json({ ok: true, keywordsScanned, newItems, deferred: keywordsScanned < DISCOVER_KEYWORDS.length });
-  } catch (err) {
-    console.error('[server] Program Keşfi taraması başarısız:', err);
-    res.status(502).json({ error: 'scan failed' });
   }
+  res.json({ ok: true, keywordsScanned, newItems, errors, deferred: keywordsScanned < DISCOVER_KEYWORDS.length });
 });
 
 app.get('/api/discover/pending', async (_req, res) => {
@@ -379,6 +397,33 @@ app.get('/api/discover/relevant', async (_req, res) => {
   }
 });
 
+const TELEGRAM_MAX_CHARS = 3500; // Telegram'ın 4096 sınırının altında güvenli bir pay
+
+function buildDiscoveryMessages(items) {
+  const itemTexts = items.map((it) => `• ${it.title}\n  ${it.snippet}\n  ${it.link}`);
+  const chunks = [];
+  let current = [];
+  let currentLen = 0;
+  for (const text of itemTexts) {
+    const addedLen = text.length + 2;
+    if (current.length > 0 && currentLen + addedLen > TELEGRAM_MAX_CHARS) {
+      chunks.push(current);
+      current = [];
+      currentLen = 0;
+    }
+    current.push(text);
+    currentLen += addedLen;
+  }
+  if (current.length > 0) chunks.push(current);
+
+  return chunks.map((chunk, i) => {
+    const header = chunks.length > 1
+      ? `🔎 Yeni ilgili program/ilan (${i + 1}/${chunks.length}, toplam ${items.length}):`
+      : `🔎 ${items.length} yeni ilgili program/ilan bulundu:`;
+    return [header, '', ...chunk].join('\n\n');
+  });
+}
+
 app.post('/api/discover/mark-filtered', express.json({ limit: '1mb' }), async (req, res) => {
   if (!DISCOVER_CONFIGURED) {
     res.status(503).json({ error: 'discovery not configured' });
@@ -403,14 +448,19 @@ app.post('/api/discover/mark-filtered', express.json({ limit: '1mb' }), async (r
       if (relevant) toNotify.push(item);
     }
     if (toNotify.length > 0 && TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-      const lines = [`🔎 ${toNotify.length} yeni ilgili program/ilan bulundu:`, ''];
-      for (const it of toNotify) {
-        lines.push(`• ${it.title}\n  ${it.snippet}\n  ${it.link}`);
-      }
-      try {
-        await sendTelegramMessage(lines.join('\n\n'));
-      } catch (err) {
-        console.error('[server] Program Keşfi Telegram bildirimi gönderilemedi:', err);
+      // Telegram mesaj başına ~4096 karaktere izin veriyor — normal
+      // koşulda (haftada birkaç yeni sonuç) tek mesaja rahatça sığar, ama
+      // büyük bir ilk yükleme/birikmiş kuyruk durumunda tek mesaj bu
+      // sınırı aşıp Telegram API'sinden 400 hatası alabilir (gerçek testte
+      // 113 sonuçla başımıza geldi). Bu yüzden gerektiğinde birkaç mesaja
+      // bölünüyor — yine de "her sonuç ayrı mesaj" spam'inden kaçınılıyor,
+      // sadece limити aşan büyük bir toplu bildirim birkaç parçaya ayrılıyor.
+      for (const message of buildDiscoveryMessages(toNotify)) {
+        try {
+          await sendTelegramMessage(message);
+        } catch (err) {
+          console.error('[server] Program Keşfi Telegram bildirimi gönderilemedi:', err);
+        }
       }
     }
     res.json({ ok: true, marked: results.length, notified: toNotify.length });
