@@ -2,6 +2,7 @@ import { useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useApp } from '../../state/AppState';
 import { colors, fonts } from '../../lib/theme';
 import { compressImage } from '../../lib/image';
+import { uploadImage } from '../../lib/upload';
 import { buildProjectViews, PROJECT_STATE_OPTIONS } from '../../lib/projects';
 
 export function Projects() {
@@ -46,6 +47,7 @@ function ProjectDetail({ view }: { view: ReturnType<typeof buildProjectViews>[nu
   const app = useApp();
   const [qNote, setQNote] = useState(view.note);
   const [qTask, setQTask] = useState('');
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const key = view.key;
@@ -54,7 +56,13 @@ function ProjectDetail({ view }: { view: ReturnType<typeof buildProjectViews>[nu
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    app.setProjectImage(key, await compressImage(file));
+    setPhotoError(null);
+    try {
+      const url = await uploadImage(await compressImage(file));
+      app.setProjectImage(key, url);
+    } catch {
+      setPhotoError('Fotoğraf yüklenemedi, tekrar dene.');
+    }
   };
 
   const chipStyle = (active: boolean, color: string): CSSProperties => ({
@@ -104,11 +112,12 @@ function ProjectDetail({ view }: { view: ReturnType<typeof buildProjectViews>[nu
       {view.image && (
         <img src={view.image} alt={view.title} style={{ width: '100%', maxWidth: 420, borderRadius: 4, border: `1px solid ${colors.border}` }} />
       )}
-      <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={handlePhoto} />
         <span onClick={() => fileRef.current?.click()} className="hover-underline" style={{ fontFamily: fonts.sans, fontSize: 11, color: colors.rose, cursor: 'pointer' }}>
           {view.image ? 'fotoğrafı değiştir' : '+ fotoğraf ekle'}
         </span>
+        {photoError && <span style={{ fontSize: 11, color: '#B0554F' }}>{photoError}</span>}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

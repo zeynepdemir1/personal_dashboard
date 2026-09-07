@@ -1,4 +1,4 @@
-import { useRef, type ChangeEvent, type CSSProperties } from 'react';
+import { useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useApp } from '../../state/AppState';
 import { colors, fonts, pillStyle, dayBlockStyle, gcalBlockStyle, HOUR_ROW_HEIGHT } from '../../lib/theme';
 import { LINKS, PROGRAMS, TOPICS, AUG31_BLOCKS, timeToHour } from '../../lib/data';
@@ -7,6 +7,7 @@ import { daysLeftUntil, daysLeftColor, formatDaysLeft, formatMonthDay, parseDotD
 import { SEED_LEARN_ENTRIES } from '../../lib/learn';
 import { eventsOnDate } from '../../lib/googleCalendar';
 import { compressImage } from '../../lib/image';
+import { uploadImage } from '../../lib/upload';
 import { formatHeaderDate, greetingName, greetingWord } from '../../lib/profile';
 import { buildProjectViews } from '../../lib/projects';
 
@@ -131,18 +132,32 @@ export function Home() {
 
   const topicFileRef = useRef<HTMLInputElement>(null);
   const projectFileRef = useRef<HTMLInputElement>(null);
+  const [topicPhotoError, setTopicPhotoError] = useState<string | null>(null);
+  const [projectPhotoError, setProjectPhotoError] = useState<string | null>(null);
 
   const handleTopicPhoto = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    app.addTopic(await compressImage(file));
+    setTopicPhotoError(null);
+    try {
+      const url = await uploadImage(await compressImage(file));
+      app.addTopic(url);
+    } catch {
+      setTopicPhotoError('Fotoğraf yüklenemedi, tekrar dene.');
+    }
   };
   const handleProjectPhoto = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    app.addProject(await compressImage(file));
+    setProjectPhotoError(null);
+    try {
+      const url = await uploadImage(await compressImage(file));
+      app.addProject(url);
+    } catch {
+      setProjectPhotoError('Fotoğraf yüklenemedi, tekrar dene.');
+    }
   };
 
   return (
@@ -300,6 +315,7 @@ export function Home() {
               Ekle
             </div>
           </div>
+          {topicPhotoError && <span style={{ fontSize: 11, color: '#B0554F' }}>{topicPhotoError}</span>}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, border: `1px solid ${colors.border}`, background: colors.panel, padding: '20px 20px 18px', borderRadius: 4 }}>
@@ -348,6 +364,7 @@ export function Home() {
               Ekle
             </div>
           </div>
+          {projectPhotoError && <span style={{ fontSize: 11, color: '#B0554F' }}>{projectPhotoError}</span>}
         </div>
       </section>
 

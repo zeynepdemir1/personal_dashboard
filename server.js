@@ -14,6 +14,7 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
+import { v2 as cloudinary } from 'cloudinary';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -42,6 +43,20 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const CRON_SECRET = process.env.CRON_SECRET;
 
+const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
+const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
+const CLOUDINARY_CONFIGURED = !!(CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET);
+if (CLOUDINARY_CONFIGURED) {
+  cloudinary.config({
+    cloud_name: CLOUDINARY_CLOUD_NAME,
+    api_key: CLOUDINARY_API_KEY,
+    api_secret: CLOUDINARY_API_SECRET,
+  });
+} else {
+  console.warn('[server] Cloudinary ortam değişkenleri eksik — fotoğraf yükleme devre dışı kalacak.');
+}
+
 const app = express();
 
 if (GCAL_ICS_URL) {
@@ -61,6 +76,49 @@ if (GCAL_ICS_URL) {
 } else {
   console.warn('[server] GCAL_ICS_URL tanımlı değil — Google Calendar senkronizasyonu devre dışı kalacak.');
 }
+
+// Fotoğraf yükleme (bkz. PLAN.md Aşama 16) — Merak Konuları/Proje
+// Fikirleri fotoğrafları artık localStorage'a base64 olarak gömülmüyor
+// (kota dolup sessizce kaybolma riski, bkz. Aşama 15 madde 1); istemci
+// önce compressImage() ile küçültüp buraya gönderiyor, biz de Cloudinary'ye
+// yükleyip dönen kalıcı URL'i geri veriyoruz — localStorage'da sadece bu
+// URL duruyor. API secret'ı hiçbir zaman istemciye gönderilmiyor, yükleme
+// tamamen sunucu tarafında (Cloudinary Node SDK) yapılıyor.
+//
+// KASITLI SINIRLAMA: Bu uç nokta bir şifre/sır ile korunmuyor (Telegram
+// uç noktasının aksine) — çünkü tarayıcı normal kullanım sırasında
+// doğrudan buraya istek atıyor ve bir "sır" istemci JS'ine gömülürse zaten
+// herkes tarafından okunabilir olurdu (gerçek koruma sağlamaz). Bunun
+// yerine tek koruma dosya boyutu sınırı (MAX_UPLOAD_BYTES) ve
+// data:image/ önekinin doğrulanması. Uygulama tek kullanıcılı, gizli bir
+// URL'de barındığı için kabul edilebilir bir risk olarak değerlendirildi.
+const MAX_UPLOAD_BYTES = 6 * 1024 * 1024; // 6 MB (base64 öncesi tahmini üst sınır)
+
+app.post('/api/upload-image', express.json({ limit: '8mb' }), async (req, res) => {
+  if (!CLOUDINARY_CONFIGURED) {
+    res.status(503).json({ error: 'image storage not configured' });
+    return;
+  }
+  const dataUrl = req.body?.image;
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+    res.status(400).json({ error: 'invalid image' });
+    return;
+  }
+  if (dataUrl.length > MAX_UPLOAD_BYTES) {
+    res.status(413).json({ error: 'image too large' });
+    return;
+  }
+  try {
+    const result = await cloudinary.uploader.upload(dataUrl, {
+      folder: 'muhendis-portal',
+      resource_type: 'image',
+    });
+    res.json({ url: result.secure_url });
+  } catch (err) {
+    console.error('[server] Cloudinary yükleme hatası:', err);
+    res.status(502).json({ error: 'upload failed' });
+  }
+});
 
 // Günlük Telegram bildirimi (bkz. PLAN.md Aşama 15, madde 5) — GitHub
 // Actions'taki zamanlanmış bir workflow bu uç noktayı her gün tetikler

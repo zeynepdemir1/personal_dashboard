@@ -144,16 +144,21 @@ Aşama 10 (özetleme) bittikten sonra ele alınacak.
 
 **Aşama 15 tamamlandı.** Aşama 12'ye (Gecikmeli Özetleme Kuyruğu) geçmeden önce Zeynep'in onayı bekleniyor.
 
-## Aşama 16 — Fotoğraf Depolamasını Sunucu Tarafına Taşı (Cloudinary)
-**Öncelik notu:** Aşama 12'den hemen sonra ele alınacak — Aşama 11 ve 14'ten önce. Zeynep'in isteği: Aşama 15'teki `compressImage()` sıkıştırması geçici bir yama; localStorage'ın kendi boyut sınırı (tarayıcıya göre değişse de tipik 5-10MB) fotoğraf sayısı arttıkça yine dolacak. Kalıcı çözüm: fotoğrafları Cloudinary'nin ücretsiz katmanında sakla, localStorage'da sadece dönen URL'i tut — Render'ın kendi diskine yazmak seçenek değil çünkü disk kalıcı değil (uyku/yeniden başlatmada silinir).
+## Aşama 16 — Fotoğraf Depolamasını Sunucu Tarafına Taşı (Cloudinary) ✅
+Zeynep'in isteği: Aşama 15'teki `compressImage()` sıkıştırması geçici bir yama; localStorage'ın kendi boyut sınırı (tarayıcıya göre değişse de tipik 5-10MB) fotoğraf sayısı arttıkça yine dolacaktı. Kalıcı çözüm: fotoğrafları Cloudinary'nin ücretsiz katmanında sakla, localStorage'da sadece dönen URL'i tut.
 
-- [ ] Cloudinary hesabı + ücretsiz katman kurulumu (Zeynep'in yapması gereken: hesap açma, `CLOUDINARY_CLOUD_NAME`/`CLOUDINARY_API_KEY`/`CLOUDINARY_API_SECRET` bilgilerini paylaşma)
-- [ ] `server.js`'e görsel yükleme uç noktası ekle (ör. `POST /api/upload-image`) — istemciden gelen görseli (yine `compressImage()`'dan geçirilip küçültülmüş halde) sunucu taraflı Cloudinary SDK ile yükler, dönen güvenli (https) URL'i client'a döner. API secret client'a hiç gönderilmez.
-- [ ] Client tarafında topic/proje fotoğraf akışını güncelle: `compressImage()` sonrası base64'ü doğrudan `image` alanına yazmak yerine önce `/api/upload-image`'a gönder, dönen URL'i `image` alanına yaz
-- [ ] Sunucuya ulaşılamazsa (Render uyanmamış/hata) kullanıcıya net bir hata göster — Ollama'daki gibi sessizce yutulmayacak, çünkü burada fotoğrafın hiç kaydedilmediğini kullanıcı bilmeli
-- [ ] Mevcut (hâlihazırda localStorage'da base64 olarak duran) fotoğraflar geriye dönük taşınmayacak — sadece bundan sonra eklenenler Cloudinary'ye gidecek (kapsam dışı, gerekirse ayrıca ele alınır)
-- [ ] `CLOUDINARY_*` ortam değişkenlerini `.env.example`'a placeholder olarak ekle, `.env.local`'e gerçek değerleriyle ekle, Render production ortam değişkenlerine de ekle
-- [ ] Aynı localStorage-kota sorunu program dosya eklerinde de var (PDF, Aşama 15 madde 4) — zaman kalırsa aynı Cloudinary altyapısı (raw/dosya yükleme desteği) oraya da uygulanır, yoksa ayrı bir not olarak bırakılır
+- [x] Cloudinary hesabı + ücretsiz katman kuruldu, kimlik bilgileri paylaşıldı
+- [x] `server.js`'e görsel yükleme uç noktası eklendi (`POST /api/upload-image`) — istemciden gelen görseli (yine `compressImage()`'dan geçirilip küçültülmüş halde) sunucu taraflı Cloudinary SDK ile yüklüyor, dönen güvenli (https) URL'i client'a döndürüyor. API secret client'a hiç gönderilmiyor. Gerçek kimlik bilgileriyle uçtan uca test edildi (curl + tarayıcı akışı) — gerçek bir görsel Cloudinary'ye yüklendi ve geri gelen URL doğrulandı.
+- [x] Client tarafında topic/proje fotoğraf akışı güncellendi (`Home.tsx`, `Projects.tsx`): `compressImage()` sonrası base64 artık doğrudan `image` alanına yazılmıyor, önce `/api/upload-image`'a gönderiliyor, dönen URL `image` alanına yazılıyor (`src/lib/upload.ts`)
+- [x] Sunucuya ulaşılamazsa/yükleme başarısız olursa kullanıcıya inline bir hata mesajı gösteriliyor ("Fotoğraf yüklenemedi, tekrar dene.") — Ollama'daki gibi sessizce yutulmuyor, çünkü burada fotoğrafın hiç kaydedilmediğini kullanıcı bilmeli
+- [x] Mevcut (hâlihazırda localStorage'da base64 olarak duran) fotoğraflar geriye dönük taşınmadı — Zeynep onayladı, sadece bundan sonra eklenenler Cloudinary'ye gidiyor
+- [x] `CLOUDINARY_*` ortam değişkenleri `.env.example`'a placeholder olarak, `.env.local`'e gerçek değerleriyle eklendi
+- [ ] **Zeynep'in yapması gereken:** Render production ortam değişkenlerine de `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` eklenmeli — eklenmezse production'da fotoğraf yükleme 503 ("image storage not configured") döner.
+- Program dosya eklerindeki (PDF, Aşama 15 madde 4) aynı localStorage-kota sorunu bilinçli olarak bu aşamanın kapsamı dışında bırakıldı — ayrı bir iş olarak ele alınabilir.
+
+### Teknik notlar
+- **Dev/prod paritesi:** Cloudinary yüklemesi basit bir pass-through proxy olamaz (SDK sunucu tarafında imzalama yapıyor), bu yüzden `vite.config.ts`'e de aynı mantığı tekrarlayan küçük bir dev-only middleware eklendi (`uploadImageDevPlugin`) — böylece fotoğraf ekleme `npm run dev` sırasında da çalışıyor, sadece production'da test etmeye gerek yok. server.js ile vite.config.ts arasında küçük bir mantık tekrarı var (kabul edilebilir, iki dosya da zaten dev/prod ayrımını benzer şekilde yönetiyor).
+- **Kasıtlı güvenlik kararı:** `/api/upload-image` bir paylaşımlı sır (Telegram uç noktasındaki `CRON_SECRET` gibi) ile korunmuyor — çünkü tarayıcı normal kullanımda doğrudan bu uç noktaya istek atıyor ve istemci JS'ine gömülecek bir sır zaten herkes tarafından okunabilir olurdu, gerçek bir koruma sağlamazdı. Tek koruma: dosya boyutu sınırı (6MB) ve `data:image/` önekinin doğrulanması. Uygulama tek kullanıcılı olduğu ve gizli bir URL'de barındığı için kabul edilebilir bir risk.
 
 ## Aşama 14 — Test ve Yayına Hazırlık
 - [ ] Tüm modüllerde hover/tıklanabilirlik göstergelerinin (pointer cursor) tutarlı çalıştığını doğrula
