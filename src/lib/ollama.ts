@@ -25,7 +25,7 @@ const CONNECTED_LABEL = 'Yerel AI çalışıyor';
 // server.js'in /api/* için 404 dönmesi gerekiyor ama bir gün SPA
 // fallback'ine yanlışlıkla düşerse (200 + index.html) bu kontrol onu da
 // yakalar; sadece res.ok kullansaydık "bağlı" sanabilirdik.
-async function pingOllama(): Promise<boolean> {
+export async function pingOllama(): Promise<boolean> {
   try {
     const res = await fetch(`${BASE}/api/tags`, { signal: AbortSignal.timeout(3000) });
     if (!res.ok) return false;

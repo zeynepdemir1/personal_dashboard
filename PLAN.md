@@ -83,12 +83,12 @@ Aşama 10 (özetleme) bittikten sonra ele alınacak.
 - [ ] Yerel model (Ollama) yeni sonuçları kullanıcının Akademik Gelişim içeriğiyle eşleştirip önem sırasına göre önersin
 - [ ] İleride değerlendirilecek: anahtar kelimelerin kullanıcı içeriğinden otomatik çıkarılması (şimdilik kapsam dışı)
 
-## Aşama 12 — Gecikmeli Özetleme Kuyruğu
-Aşama 11 (Program Keşfi) ile birlikte, ikisi de şimdilik plana not edildi — henüz ele alınmadı.
-- [ ] Her Bir Şey Öğrendim girişine bir durum alanı ekle: `özetlenmedi` / `özetlendi`
-- [ ] Ollama'ya erişilemeyen bir cihazdan girildiğinde giriş sadece `özetlenmedi` durumunda kalsın — hata gösterilmesin (mevcut sessiz-vazgeçme davranışı zaten böyle, bkz. Aşama 10)
-- [ ] Uygulama, Ollama'nın erişilebilir olduğu bir cihazda açıldığında (bağlantı kontrolü başarılı olduğunda) arka planda otomatik olarak bekleyen tüm `özetlenmedi` durumundaki girişleri sırayla işlesin
-- [ ] Mevcut Ollama proxy yapısını bozma — bu sadece "ne zaman tetiklenir" mantığını ekleyen bir katman olacak
+## Aşama 12 — Gecikmeli Özetleme Kuyruğu ✅
+- [x] Her Bir Şey Öğrendim girişine bir durum alanı ekle: `özetlenmedi` / `özetlendi` — ayrı bir alan yerine mevcut `summary` alanının varlığından türetiliyor (persisted `learnEntries` zaten sadece kullanıcı girişlerini tutuyor, seed girişlerin hepsinde `summary` her zaman dolu — bu yüzden ek/yinelenen bir alan gereksiz olurdu); Learn ekranında özet yoksa küçük bir "özetlenmedi" göstergesi çıkıyor
+- [x] Ollama'ya erişilemeyen bir cihazdan girildiğinde giriş sadece `özetlenmedi` durumunda kalıyor — hata gösterilmiyor (mevcut sessiz-vazgeçme davranışı zaten böyleydi, bkz. Aşama 10)
+- [x] Uygulama, Ollama'nın erişilebilir olduğu bir cihazda açıldığında (bağlantı kontrolü başarılı olduğunda) arka planda otomatik olarak bekleyen tüm `özetlenmedi` durumundaki girişleri sırayla işliyor — `AppState.tsx`'te mount'ta bir kez `pingOllama()` çağrılıyor, başarılıysa özetlenmemiş girişler sırayla (paralel değil) işleniyor
+- [x] Mevcut Ollama proxy yapısı bozulmadı — bu sadece "ne zaman tetiklenir" mantığını ekleyen bir katman
+- Gerçek Ollama (llama3.1:8b) çalışırken uçtan uca test edildi: localStorage'a elle özetlenmemiş bir giriş eklenip sayfa yenilendiğinde, kuyruk otomatik olarak özeti üretti, Akademik Gelişim'e gerçek bir kayıt ekledi ve arayüzdeki "özetlenmedi" göstergesi kayboldu.
 
 ## Aşama 13 — Yayına Alma (Deployment) ✅ (kod tarafı hazır — deploy'u Zeynep kendi hesabıyla yapacak)
 - [x] Build/production konfigürasyonunu kontrol et, gerekirse düzelt (`npm run build` sorunsuz çalışsın)
@@ -143,6 +143,17 @@ Aşama 11 (Program Keşfi) ile birlikte, ikisi de şimdilik plana not edildi —
 - [x] Çoklu kullanıcı/hesap ekleme özelliğini tamamen kaldırıldı — tek profilli yapıya sadeleştirildi
 
 **Aşama 15 tamamlandı.** Aşama 12'ye (Gecikmeli Özetleme Kuyruğu) geçmeden önce Zeynep'in onayı bekleniyor.
+
+## Aşama 16 — Fotoğraf Depolamasını Sunucu Tarafına Taşı (Cloudinary)
+**Öncelik notu:** Aşama 12'den hemen sonra ele alınacak — Aşama 11 ve 14'ten önce. Zeynep'in isteği: Aşama 15'teki `compressImage()` sıkıştırması geçici bir yama; localStorage'ın kendi boyut sınırı (tarayıcıya göre değişse de tipik 5-10MB) fotoğraf sayısı arttıkça yine dolacak. Kalıcı çözüm: fotoğrafları Cloudinary'nin ücretsiz katmanında sakla, localStorage'da sadece dönen URL'i tut — Render'ın kendi diskine yazmak seçenek değil çünkü disk kalıcı değil (uyku/yeniden başlatmada silinir).
+
+- [ ] Cloudinary hesabı + ücretsiz katman kurulumu (Zeynep'in yapması gereken: hesap açma, `CLOUDINARY_CLOUD_NAME`/`CLOUDINARY_API_KEY`/`CLOUDINARY_API_SECRET` bilgilerini paylaşma)
+- [ ] `server.js`'e görsel yükleme uç noktası ekle (ör. `POST /api/upload-image`) — istemciden gelen görseli (yine `compressImage()`'dan geçirilip küçültülmüş halde) sunucu taraflı Cloudinary SDK ile yükler, dönen güvenli (https) URL'i client'a döner. API secret client'a hiç gönderilmez.
+- [ ] Client tarafında topic/proje fotoğraf akışını güncelle: `compressImage()` sonrası base64'ü doğrudan `image` alanına yazmak yerine önce `/api/upload-image`'a gönder, dönen URL'i `image` alanına yaz
+- [ ] Sunucuya ulaşılamazsa (Render uyanmamış/hata) kullanıcıya net bir hata göster — Ollama'daki gibi sessizce yutulmayacak, çünkü burada fotoğrafın hiç kaydedilmediğini kullanıcı bilmeli
+- [ ] Mevcut (hâlihazırda localStorage'da base64 olarak duran) fotoğraflar geriye dönük taşınmayacak — sadece bundan sonra eklenenler Cloudinary'ye gidecek (kapsam dışı, gerekirse ayrıca ele alınır)
+- [ ] `CLOUDINARY_*` ortam değişkenlerini `.env.example`'a placeholder olarak ekle, `.env.local`'e gerçek değerleriyle ekle, Render production ortam değişkenlerine de ekle
+- [ ] Aynı localStorage-kota sorunu program dosya eklerinde de var (PDF, Aşama 15 madde 4) — zaman kalırsa aynı Cloudinary altyapısı (raw/dosya yükleme desteği) oraya da uygulanır, yoksa ayrı bir not olarak bırakılır
 
 ## Aşama 14 — Test ve Yayına Hazırlık
 - [ ] Tüm modüllerde hover/tıklanabilirlik göstergelerinin (pointer cursor) tutarlı çalıştığını doğrula

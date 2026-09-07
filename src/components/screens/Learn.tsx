@@ -153,7 +153,7 @@ export function Learn() {
             </h2>
           </div>
 
-          {article.summary && (
+          {article.summary ? (
             <div style={{ borderLeft: `2px solid ${colors.rose}`, padding: '2px 0 2px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ fontFamily: fonts.sans, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#A9464E' }}>
                 Yerel model özeti
@@ -161,6 +161,12 @@ export function Learn() {
               <p style={{ margin: 0, fontFamily: fonts.serif, fontSize: 16.5, lineHeight: 1.6, color: colors.ink, textWrap: 'pretty' }}>
                 {article.summary}
               </p>
+            </div>
+          ) : (
+            <div style={{ borderLeft: `2px solid ${colors.borderStrong}`, padding: '2px 0 2px 18px' }}>
+              <div style={{ fontFamily: fonts.sans, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.inkFaint }}>
+                özetlenmedi · Ollama'ya erişilebilen bir cihazda açılınca otomatik özetlenecek
+              </div>
             </div>
           )}
 

@@ -11,7 +11,7 @@ import {
 import { makeLearnEntry, type LearnEntry } from '../lib/learn';
 import { deriveTitleFromUrl } from '../lib/url';
 import { fetchGoogleCalendarEvents, type GCalEvent, type GCalSyncStatus } from '../lib/googleCalendar';
-import { summarizeLearnEntry } from '../lib/ollama';
+import { pingOllama, summarizeLearnEntry } from '../lib/ollama';
 import { formatMonthDay, referenceToday } from '../lib/dates';
 import { DEFAULT_PROFILE_NAME } from '../lib/profile';
 import {
@@ -325,6 +325,56 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [persisted]);
 
   const patch = (p: Partial<PersistedState>) => setPersisted((s) => ({ ...s, ...p }));
+
+  // Bir Bir Şey Öğrendim girişi özetlenince hem kendi `summary` alanını
+  // doldurur hem de Akademik Gelişim'e gerçek bir kayıt ekler — hem
+  // saveLearnEntry hem de aşağıdaki gecikmeli özetleme kuyruğu (Aşama 12)
+  // bu ortak yolu kullanır.
+  const recordLearnSummary = (entryId: string, title: string, summary: string) => {
+    setPersisted((s) => ({
+      ...s,
+      learnEntries: s.learnEntries.map((e) => (e.id === entryId ? { ...e, summary } : e)),
+    }));
+    const { day, month } = formatMonthDay(referenceToday());
+    const growthNote: GrowthNote = {
+      date: `${day} ${month}`,
+      title,
+      body: summary,
+      source: 'Bir Şey Öğrendim',
+      dot: ROSE,
+      link: 'girişe git',
+    };
+    setPersisted((s) => ({ ...s, extraGrowthNotes: [growthNote, ...s.extraGrowthNotes] }));
+  };
+
+  // Aşama 12 — Gecikmeli Özetleme Kuyruğu: bir giriş Ollama'ya
+  // erişilemeyen bir cihazda eklenirse `summary` boş kalır (sessiz
+  // vazgeçme, bkz. Aşama 10 — kullanıcıya hata gösterilmez, giriş
+  // `özetlenmedi` durumunda kalır; durum burada ayrı bir alan yerine
+  // `summary`'nin varlığından türetiliyor, çünkü persisted.learnEntries
+  // zaten sadece kullanıcı girişlerini tutuyor — seed girişlerin hepsinde
+  // `summary` her zaman dolu). Uygulama Ollama'nın erişilebilir olduğu bir
+  // cihazda (yeniden) açıldığında, bekleyen tüm özetlenmemiş girişleri
+  // burada sırayla (paralel değil — yerel modele aynı anda birden fazla
+  // istek göndermemek için) işleriz. Mevcut Ollama proxy'sine dokunulmuyor,
+  // sadece "ne zaman tetiklenir" katmanı eklendi.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const ok = await pingOllama();
+      if (cancelled || !ok) return;
+      const pending = persistedRef.current.learnEntries.filter((e) => !e.summary);
+      for (const entry of pending) {
+        if (cancelled) return;
+        const summary = await summarizeLearnEntry(entry.title, entry.body.join('\n\n'));
+        if (cancelled || !summary) continue;
+        recordLearnSummary(entry.id, entry.title, summary);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [{ screen, entry }, setRoute] = useState(parseHash);
   useEffect(() => {
@@ -770,20 +820,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         // ayki not listesine gerçek bir kayıt olarak ekle.
         summarizeLearnEntry(title, body).then((summary) => {
           if (!summary) return;
-          setPersisted((s) => ({
-            ...s,
-            learnEntries: s.learnEntries.map((e) => (e.id === entry.id ? { ...e, summary } : e)),
-          }));
-          const { day, month } = formatMonthDay(referenceToday());
-          const growthNote: GrowthNote = {
-            date: `${day} ${month}`,
-            title,
-            body: summary,
-            source: 'Bir Şey Öğrendim',
-            dot: ROSE,
-            link: 'girişe git',
-          };
-          setPersisted((s) => ({ ...s, extraGrowthNotes: [growthNote, ...s.extraGrowthNotes] }));
+          recordLearnSummary(entry.id, title, summary);
         });
       },
 
