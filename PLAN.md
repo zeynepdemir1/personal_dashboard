@@ -83,14 +83,36 @@ Aşama 10 (özetleme) bittikten sonra ele alınacak.
 - [ ] Yerel model (Ollama) yeni sonuçları kullanıcının Akademik Gelişim içeriğiyle eşleştirip önem sırasına göre önersin
 - [ ] İleride değerlendirilecek: anahtar kelimelerin kullanıcı içeriğinden otomatik çıkarılması (şimdilik kapsam dışı)
 
-## Aşama 12 — Test ve Yayına Hazırlık
+## Aşama 12 — Gecikmeli Özetleme Kuyruğu
+Aşama 11 (Program Keşfi) ile birlikte, ikisi de şimdilik plana not edildi — henüz ele alınmadı.
+- [ ] Her Bir Şey Öğrendim girişine bir durum alanı ekle: `özetlenmedi` / `özetlendi`
+- [ ] Ollama'ya erişilemeyen bir cihazdan girildiğinde giriş sadece `özetlenmedi` durumunda kalsın — hata gösterilmesin (mevcut sessiz-vazgeçme davranışı zaten böyle, bkz. Aşama 10)
+- [ ] Uygulama, Ollama'nın erişilebilir olduğu bir cihazda açıldığında (bağlantı kontrolü başarılı olduğunda) arka planda otomatik olarak bekleyen tüm `özetlenmedi` durumundaki girişleri sırayla işlesin
+- [ ] Mevcut Ollama proxy yapısını bozma — bu sadece "ne zaman tetiklenir" mantığını ekleyen bir katman olacak
+
+## Aşama 13 — Yayına Alma (Deployment) ✅ (kod tarafı hazır — deploy'u Zeynep kendi hesabıyla yapacak)
+- [x] Build/production konfigürasyonunu kontrol et, gerekirse düzelt (`npm run build` sorunsuz çalışsın)
+- [x] Ortam değişkenleri (ör. Google Calendar linki) hem yerel geliştirmede (`.env.local`) hem production'da (hosting servisinin ortam değişkenleri paneli) doğru okunacak şekilde kodu ayarla
+- [x] Ollama bağlantısı bulunamadığında (production'da, farklı bir cihazdan erişildiğinde) uygulama çökmesin — sadece "Yerel AI şu an kullanılamıyor" gibi zarif bir mesaj göstersin, hata fırlatmasın
+- [x] README.md'ye projenin nasıl deploy edileceğine dair kısa bir not ekle
+- [x] Barındırma hedefi: Render/Railway (Zeynep kendi hesabıyla deploy edecek)
+
+### Yayına alma — teknik notlar
+- Uygulama artık salt statik bir site değil: yeni `server.js` (Express 5) hem derlenmiş `dist/`'i sunuyor hem de Google Calendar'ın gizli iCal adresini sunucu tarafında proxy'liyor. Render/Railway'de **"Web Service" (Node)** olarak deploy edilmeli — salt statik barındırma (GitHub Pages gibi) Google Calendar senkronizasyonunu çalıştırmaz.
+- Build: `npm install && npm run build`. Start: `npm start` (→ `node server.js`, `package.json`'a eklendi).
+- Ortam değişkeni `GCAL_ICS_URL`, hosting panelinden ayarlanır — kodda hiçbir yerde sabit yazılı değil. Yerel test için `server.js`, `.env.local`'i kendi başına (harici paket olmadan) okuyan küçük bir yükleyiciyle çalışıyor; production'da bu dosya hiç yok, platform zaten `process.env`'i kendisi dolduruyor.
+- Ollama için production'da BİLEREK proxy yok (`/api/ollama/*` gerçek 404 döner) — istemci (`useOllamaStatus`) artık sadece `res.ok`'a değil yanıtın gerçekten `{models: [...]}` şeklinde olup olmadığına da bakıyor (SPA fallback'inin yanlışlıkla "bağlı" sanılmasına karşı ek güvenlik). Bağlı değilken "Yerel AI şu an kullanılamıyor" gösteriyor.
+- Gerçek Express sunucusuyla yerelde uçtan uca test edildi: statik site 200, `/api/calendar.ics` gerçek takvim verisini döndü, `/api/ollama/*` ve tanımsız `/api/*` yolları 404, bilinmeyen normal yollar `index.html`'e düşüyor (hash routing kullanıldığı için zaten gerekmiyor ama güvenlik ağı olarak duruyor).
+- Express 5 kullanılıyor — bare `'*'` joker artık geçersiz, `'/*splat'` gerekiyor (bu proje için düzeltildi, ileride Express güncellenirse akılda tutulmalı).
+
+## Aşama 14 — Test ve Yayına Hazırlık
 - [ ] Tüm modüllerde hover/tıklanabilirlik göstergelerinin (pointer cursor) tutarlı çalıştığını doğrula
 - [ ] GitHub'a düzenli commit/push
 - [ ] README.md ile projeyi kısaca belgelendir
-- [ ] Barındırma (hosting) stratejisi ayrıca konuşulacak (backend gerektiren kısımlar var, sadece GitHub Pages yetmez)
+- [ ] Barındırma (hosting) stratejisi — **Aşama 13'te Render/Railway olarak netleşti**, bu maddenin geri kalanı orada ele alınıyor
 
 ### Barındırma kararını etkileyecek teknik notlar
-- **Google Calendar senkronizasyonu (Aşama 9) sadece `npm run dev` sırasında çalışır.** CORS yüzünden tarayıcı Google'ın iCal adresine doğrudan istek atamıyor; şu an bunu Vite'ın geliştirme sunucusu proxy'si (`vite.config.ts` → `/api/calendar.ics`) çözüyor. Bu proxy `vite build` çıktısında YOK — statik bir yere (ör. GitHub Pages) yayınlarsak bu özellik tamamen çalışmaz. Yayına alırken bunun için küçük bir sunucu/serverless fonksiyon (Vercel/Netlify function, Cloudflare Worker vb.) gerekecek — bu fonksiyon gizli iCal adresini ortam değişkeni olarak tutup isteği sunucu tarafında yapacak.
+- **Google Calendar senkronizasyonu (Aşama 9) geliştirmede sadece Vite dev-proxy ile çalışıyordu.** CORS yüzünden tarayıcı Google'ın iCal adresine doğrudan istek atamıyor. Aşama 13'te bunun için gerçek bir production çözümü kuruldu — detaylar Aşama 13'ün altında.
 
 ---
 **Not:** Her aşama bitince Zeynep'e kısa bir özet ver (ne yapıldı, hangi dosyalar değişti), sıradaki aşamaya geçmeden önce onay bekle.

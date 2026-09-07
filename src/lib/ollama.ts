@@ -1,9 +1,12 @@
 // Ollama'nın yerel HTTP API'sine (varsayılan http://localhost:11434)
 // erişim. Google Calendar entegrasyonuyla aynı sebeple (CORS) doğrudan
-// değil, Vite'ın geliştirme sunucusu proxy'si üzerinden gidiyoruz
-// (bkz. vite.config.ts, /api/ollama) — bu sayede OLLAMA_ORIGINS ayarı
-// gerekmiyor. NOT: Ollama zaten yalnızca bu bilgisayarda çalıştığı için
-// bu özellik doğası gereği hep yerel kalacak (bkz. PLAN.md Aşama 12).
+// değil, bir proxy üzerinden gidiyoruz — geliştirmede Vite dev-proxy
+// (bkz. vite.config.ts, /api/ollama), production'da server.js (bkz.
+// PLAN.md Aşama 13). Production'da bu proxy KASITLI olarak yok — Ollama
+// yalnızca Zeynep'in kendi bilgisayarında çalıştığı için bu özellik
+// doğası gereği hep yerel kalacak; production'daki istekler server.js'in
+// /api/* için döndürdüğü gerçek 404'e düşer, aşağıdaki kontrol bunu
+// düzgün şekilde "bağlı değil" olarak yorumlar (hata fırlatmaz).
 import { useEffect, useState } from 'react';
 
 const BASE = '/api/ollama';
@@ -14,10 +17,20 @@ export interface OllamaStatus {
   label: string;
 }
 
+const DISCONNECTED_LABEL = 'Yerel AI şu an kullanılamıyor';
+const CONNECTED_LABEL = 'Yerel AI çalışıyor';
+
+// Sadece res.ok'a değil, yanıtın gerçekten Ollama'nın /api/tags şekline
+// (bir `models` dizisi) sahip olmasına da bakıyoruz — production'da
+// server.js'in /api/* için 404 dönmesi gerekiyor ama bir gün SPA
+// fallback'ine yanlışlıkla düşerse (200 + index.html) bu kontrol onu da
+// yakalar; sadece res.ok kullansaydık "bağlı" sanabilirdik.
 async function pingOllama(): Promise<boolean> {
   try {
     const res = await fetch(`${BASE}/api/tags`, { signal: AbortSignal.timeout(3000) });
-    return res.ok;
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => null);
+    return !!data && Array.isArray(data.models);
   } catch {
     return false;
   }
@@ -27,14 +40,14 @@ async function pingOllama(): Promise<boolean> {
 // açılışında ve ardından periyodik olarak (30 sn) yoklar, böylece Ollama
 // sayfa açıkken başlatılsa/durdurulsa bile durum kendiliğinden güncellenir.
 export function useOllamaStatus(): OllamaStatus {
-  const [status, setStatus] = useState<OllamaStatus>({ connected: false, label: 'Yerel model bağlı değil' });
+  const [status, setStatus] = useState<OllamaStatus>({ connected: false, label: DISCONNECTED_LABEL });
 
   useEffect(() => {
     let cancelled = false;
     const check = () => {
       pingOllama().then((ok) => {
         if (cancelled) return;
-        setStatus(ok ? { connected: true, label: 'Yerel model çalışıyor' } : { connected: false, label: 'Yerel model bağlı değil' });
+        setStatus(ok ? { connected: true, label: CONNECTED_LABEL } : { connected: false, label: DISCONNECTED_LABEL });
       });
     };
     check();
