@@ -14,7 +14,7 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { v2 as cloudinary } from 'cloudinary';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -66,7 +66,223 @@ if (!DISCOVER_CONFIGURED) {
   console.warn('[server] SerpApi/Upstash ortam değişkenleri eksik — Program Keşfi devre dışı kalacak.');
 }
 
+// Sabit zamanlı (timing-safe) string karşılaştırma — parola/sır
+// kontrollerinde `===`/`!==` yerine bunu kullanıyoruz, çünkü `===` bir
+// eşleşmezlik bulur bulmaz döner ve bu küçük zaman farkı teorik olarak
+// karakter karakter parola tahmin etmekte (timing attack) kullanılabilir.
+// Önce sabit uzunlukta (32 byte) hash'liyoruz ki farklı uzunluktaki
+// girdilerde de crypto.timingSafeEqual çökmesin.
+function timingSafeStringEqual(a, b) {
+  const ah = createHash('sha256').update(String(a)).digest();
+  const bh = createHash('sha256').update(String(b)).digest();
+  return timingSafeEqual(ah, bh);
+}
+
+// Site geneli erişim koruması (bkz. PLAN.md Aşama 17, madde 1-2) — site
+// artık zdemir.tech üzerinden herkese açık olduğu için eklendi. Çoklu
+// kullanıcı/hesap sistemi DEĞİL: tek bir paylaşılan parola (SITE_PASSWORD)
+// + imzalı bir oturum çerezi. Oturum durumu sunucuda TUTULMUYOR (stateless)
+// — Render'ın ücretsiz planı sık sık yeniden başladığı için (bkz. Aşama 16)
+// bellekte tutulan bir oturum listesi her yeniden başlatmada herkesi
+// çıkışa zorlardı. Bunun yerine çerezin kendisi HMAC ile imzalanıyor;
+// SESSION_SECRET değişirse (ör. şüpheli bir erişim sonrası) TÜM oturumlar
+// aynı anda geçersiz olur — bu da bir çeşit "herkesi çıkışa zorla" aracı.
+const SITE_PASSWORD = process.env.SITE_PASSWORD;
+const SESSION_SECRET = process.env.SESSION_SECRET;
+const AUTH_CONFIGURED = !!(SITE_PASSWORD && SESSION_SECRET);
+if (!AUTH_CONFIGURED) {
+  console.warn('[server] SITE_PASSWORD/SESSION_SECRET tanımlı değil — site KORUMASIZ kalacak. Bunu production\'da ASLA böyle bırakma.');
+}
+
+const SESSION_COOKIE = 'mgp_session';
+const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 gün
+// GitHub Actions'ın X-Cron-Secret ile zaten kendi başına koruduğu uç
+// noktalar — bunlar oturum çerezi OLMADAN da çağrılabilmeli (GitHub
+// Actions'ın tarayıcı çerezi olamaz), kendi CRON_SECRET kontrolleri zaten
+// route içinde var.
+const CRON_ONLY_PATHS = new Set(['/api/notify/daily', '/api/discover/scan']);
+
+function signSession(expiresAt) {
+  const payload = String(expiresAt);
+  const sig = createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  return `${payload}.${sig}`;
+}
+
+function verifySession(token) {
+  if (!token || typeof token !== 'string') return false;
+  const dot = token.indexOf('.');
+  if (dot === -1) return false;
+  const payload = token.slice(0, dot);
+  const sig = token.slice(dot + 1);
+  const expectedSig = createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  if (sig.length !== expectedSig.length) return false;
+  if (!timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expectedSig, 'hex'))) return false;
+  const expiresAt = Number(payload);
+  return Number.isFinite(expiresAt) && expiresAt > Date.now();
+}
+
+function parseCookies(req) {
+  const header = req.headers.cookie;
+  if (!header) return {};
+  const out = {};
+  for (const part of header.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq === -1) continue;
+    out[part.slice(0, eq).trim()] = decodeURIComponent(part.slice(eq + 1).trim());
+  }
+  return out;
+}
+
+const LOGIN_PAGE_HTML = `<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Giriş — Mühendis Gelişim Portalı</title>
+<style>
+  html,body{margin:0;padding:0;background:#FBF1F0;color:#3D2B2E;font-family:-apple-system,'IBM Plex Sans',Helvetica,sans-serif;}
+  body{min-height:100vh;display:flex;align-items:center;justify-content:center;}
+  form{display:flex;flex-direction:column;gap:14px;width:280px;padding:36px 30px;background:#FFFBFA;border:1px solid #E8D3D3;border-radius:6px;}
+  h1{margin:0 0 4px;font-size:18px;font-weight:500;text-align:center;}
+  input{padding:12px 14px;border:1px solid #D5C5C8;border-radius:4px;font-size:14px;background:#FFFFFF;color:#3D2B2E;outline:none;letter-spacing:0.15em;text-align:center;}
+  input:focus{border-color:#DB7F8E;}
+  button{padding:12px 0;border:none;border-radius:4px;background:#604D53;color:#FFDBDA;font-size:13px;cursor:pointer;}
+  button:hover{background:#4A3B3E;}
+  #err{color:#B0554F;font-size:12.5px;text-align:center;min-height:16px;}
+</style>
+</head>
+<body>
+<form id="f">
+  <h1>Mühendis Gelişim Portalı</h1>
+  <input id="p" type="password" placeholder="Parola" autocomplete="current-password" autofocus />
+  <button type="submit">Giriş</button>
+  <div id="err"></div>
+</form>
+<script>
+document.getElementById('f').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const password = document.getElementById('p').value;
+  const err = document.getElementById('err');
+  err.textContent = '';
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    if (res.ok) {
+      location.reload();
+    } else if (res.status === 429) {
+      err.textContent = 'Çok fazla deneme yapıldı, biraz sonra tekrar dene.';
+    } else {
+      err.textContent = 'Yanlış parola.';
+    }
+  } catch {
+    err.textContent = 'Bağlantı hatası, tekrar dene.';
+  }
+});
+</script>
+</body>
+</html>`;
+
+// Basit brute-force yavaşlatması: aynı IP art arda çok denerse bir süre
+// kilitleniyor. Bellek içi (Render yeniden başlayınca sıfırlanır) — tam
+// bir çözüm değil ama tek satırlık bir bariyer bile otomatik parola
+// denemesini pratik olmaktan çıkarır.
+const loginAttempts = new Map(); // ip -> { count, lockedUntil }
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_MS = 60 * 1000;
+
+function checkAndRecordLoginAttempt(ip, success) {
+  const now = Date.now();
+  const rec = loginAttempts.get(ip) || { count: 0, lockedUntil: 0 };
+  if (rec.lockedUntil > now) return false;
+  if (success) {
+    loginAttempts.delete(ip);
+    return true;
+  }
+  rec.count += 1;
+  if (rec.count >= LOGIN_MAX_ATTEMPTS) {
+    rec.lockedUntil = now + LOGIN_LOCKOUT_MS;
+    rec.count = 0;
+  }
+  loginAttempts.set(ip, rec);
+  return true;
+}
+
 const app = express();
+// Render (ve çoğu PaaS) bir ters proxy arkasında çalıştırıyor — bu
+// olmadan req.ip her zaman proxy'nin kendi adresini gösterir, IP başına
+// giriş denemesi sınırlaması (aşağıda) işe yaramaz hale gelir.
+app.set('trust proxy', 1);
+
+// Basit güvenlik başlıkları (clickjacking/MIME sniffing) — helmet gibi
+// bir bağımlılık eklemeye gerek yok, tek satırlık bir middleware yeterli.
+// Auth kontrolünden ÖNCE tanımlanıyor ki giriş sayfasının kendisi de
+// (özellikle X-Frame-Options — parola formunun bir iframe'e gömülüp
+// tıklama kaçırma/clickjacking saldırısına açık olmaması için) bu
+// başlıklarla korunsun.
+app.use((_req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  next();
+});
+
+app.use((req, res, next) => {
+  if (!AUTH_CONFIGURED) {
+    next();
+    return;
+  }
+  if (req.path === '/api/login' || CRON_ONLY_PATHS.has(req.path)) {
+    next();
+    return;
+  }
+  const cookies = parseCookies(req);
+  if (verifySession(cookies[SESSION_COOKIE])) {
+    next();
+    return;
+  }
+  if (req.path.startsWith('/api/')) {
+    res.status(401).json({ error: 'unauthorized' });
+    return;
+  }
+  res.type('html').send(LOGIN_PAGE_HTML);
+});
+
+app.post('/api/login', express.json(), (req, res) => {
+  if (!AUTH_CONFIGURED) {
+    res.status(503).json({ error: 'auth not configured' });
+    return;
+  }
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const rec = loginAttempts.get(ip);
+  if (rec && rec.lockedUntil > Date.now()) {
+    res.status(429).json({ error: 'too many attempts' });
+    return;
+  }
+  const password = req.body?.password;
+  const ok = typeof password === 'string' && timingSafeStringEqual(password, SITE_PASSWORD);
+  checkAndRecordLoginAttempt(ip, ok);
+  if (!ok) {
+    res.status(401).json({ error: 'wrong password' });
+    return;
+  }
+  const expiresAt = Date.now() + SESSION_MAX_AGE_MS;
+  res.cookie(SESSION_COOKIE, signSession(expiresAt), {
+    httpOnly: true,
+    // NODE_ENV'e güvenmiyoruz — Render bunu her zaman 'production' olarak
+    // ayarlamayabilir. Bunun yerine `trust proxy` sayesinde Express'in
+    // X-Forwarded-Proto'dan doğru şekilde hesapladığı req.secure'a bakıyoruz
+    // (bu istek gerçekten https üzerinden mi geldi).
+    secure: req.secure,
+    sameSite: 'lax',
+    maxAge: SESSION_MAX_AGE_MS,
+    path: '/',
+  });
+  res.json({ ok: true });
+});
 
 if (GCAL_ICS_URL) {
   app.get('/api/calendar.ics', async (_req, res) => {
@@ -94,13 +310,11 @@ if (GCAL_ICS_URL) {
 // URL duruyor. API secret'ı hiçbir zaman istemciye gönderilmiyor, yükleme
 // tamamen sunucu tarafında (Cloudinary Node SDK) yapılıyor.
 //
-// KASITLI SINIRLAMA: Bu uç nokta bir şifre/sır ile korunmuyor (Telegram
-// uç noktasının aksine) — çünkü tarayıcı normal kullanım sırasında
-// doğrudan buraya istek atıyor ve bir "sır" istemci JS'ine gömülürse zaten
-// herkes tarafından okunabilir olurdu (gerçek koruma sağlamaz). Bunun
-// yerine tek koruma dosya boyutu sınırı (MAX_UPLOAD_BYTES) ve
-// data:image/ önekinin doğrulanması. Uygulama tek kullanıcılı, gizli bir
-// URL'de barındığı için kabul edilebilir bir risk olarak değerlendirildi.
+// Ayrıca bir CRON_SECRET/paylaşımlı sır KONTROLÜ YOK — buna gerek yok,
+// çünkü bu uç nokta artık (Aşama 17'deki site geneli oturum koruması
+// sayesinde) zaten oturum çerezi olmadan hiç çağrılamıyor. Kalan tek
+// koruma dosya boyutu sınırı (MAX_UPLOAD_BYTES) ve data:image/ önekinin
+// doğrulanması — bunlar sır/kimlik doğrulama değil, girdi doğrulaması.
 const MAX_UPLOAD_BYTES = 6 * 1024 * 1024; // 6 MB (base64 öncesi tahmini üst sınır)
 
 app.post('/api/upload-image', express.json({ limit: '8mb' }), async (req, res) => {
@@ -193,7 +407,7 @@ async function sendTelegramMessage(text) {
 }
 
 app.post('/api/notify/daily', express.json(), async (req, res) => {
-  if (!CRON_SECRET || req.get('X-Cron-Secret') !== CRON_SECRET) {
+  if (!CRON_SECRET || !timingSafeStringEqual(req.get('X-Cron-Secret') || '', CRON_SECRET)) {
     res.status(401).json({ error: 'unauthorized' });
     return;
   }
@@ -305,7 +519,7 @@ async function serpapiSearch(keyword) {
 }
 
 app.post('/api/discover/scan', express.json(), async (req, res) => {
-  if (!CRON_SECRET || req.get('X-Cron-Secret') !== CRON_SECRET) {
+  if (!CRON_SECRET || !timingSafeStringEqual(req.get('X-Cron-Secret') || '', CRON_SECRET)) {
     res.status(401).json({ error: 'unauthorized' });
     return;
   }

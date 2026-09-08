@@ -23,6 +23,10 @@ npm run build
 
 ## Notlar
 
+- **Site geneli erişim koruması** (bkz. Güvenlik bölümü): tüm sayfalar ve
+  API uç noktaları (GitHub Actions'ın `CRON_SECRET` ile çağırdığı iki uç
+  nokta hariç) tek bir paylaşılan parola (`SITE_PASSWORD`) + imzalı bir
+  oturum çerezi arkasında. Çoklu kullanıcı/hesap sistemi değil.
 - Ekleme/işaretleme gibi tüm değişiklikler tarayıcının `localStorage`'ında
   saklanır — hesap/oturum yok, tek profilli ve tamamen yerel. İstisna:
   fotoğraflar artık Cloudinary'de tutuluyor (aşağıya bakın), localStorage'da
@@ -80,9 +84,13 @@ Start command: npm start
 | `SERPAPI_KEY`            | Hayır*     | [serpapi.com](https://serpapi.com) — Program Keşfi taraması için. Ayda 250 ücretsiz sorgu. |
 | `UPSTASH_REDIS_REST_URL` | Hayır*     | [upstash.com](https://upstash.com) — Program Keşfi'nin kalıcı deposu (Redis, REST API). |
 | `UPSTASH_REDIS_REST_TOKEN` | Hayır*   | Upstash Dashboard > REST API'den alınır. |
+| `SITE_PASSWORD`          | **Evet**   | Site geneli giriş parolası. Tanımlı değilse (SESSION_SECRET ile birlikte) site tamamen KORUMASIZ kalır. |
+| `SESSION_SECRET`         | **Evet**   | Oturum çerezlerini imzalayan sır — `node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"` ile üretilir. Değiştirilirse tüm oturumlar aynı anda geçersiz olur. |
 
 \* Uygulamanın temel işlevleri için zorunlu değil, ama ilgili özellik
 (fotoğraf yükleme / Telegram bildirimi) bu değişkenler olmadan çalışmaz.
+`SITE_PASSWORD`/`SESSION_SECRET` ise **zorunlu** — production'da eksik
+bırakılmamalı (bkz. Güvenlik bölümü).
 
 Yerel geliştirmede aynı değişken `.env.local` dosyasından okunur (bkz.
 `.env.example`) — bu dosya asla commit edilmez.
@@ -92,3 +100,29 @@ kendi bilgisayarınızda çalışır, bir hosting sunucusundan erişilemez. Bu
 beklenen bir durumdur: uygulama bunu zarifçe algılar ("Yerel AI şu an
 kullanılamıyor" mesajı gösterir), hata vermez veya çökmez. "Bir Şey
 Öğrendim" girişleri özetsiz kalır.
+
+## Güvenlik
+
+- **Site geneli giriş:** Tek paylaşılan parola (`SITE_PASSWORD`) + imzalı,
+  stateless bir oturum çerezi (30 gün). Oturum sunucuda saklanmıyor —
+  Render sık sık yeniden başladığı için bellekte tutulan bir oturum
+  listesi işe yaramaz. `SESSION_SECRET`'ı değiştirmek tüm oturumları aynı
+  anda geçersiz kılar (şüpheli bir erişimden sonra "herkesi çıkışa
+  zorlamak" için kullanılabilir).
+- IP başına 5 başarısız giriş denemesinden sonra 60 saniyelik kilit
+  (bellek içi, Render yeniden başlayınca sıfırlanır — tam bir çözüm değil
+  ama otomatik parola denemesini pratik olmaktan çıkarır).
+- `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` başlıkları
+  her yanıtta gönderiliyor.
+- Günlük (Diary) girişleri gerçekten şifreleniyor: AES-GCM, tarayıcıda
+  (Web Crypto API), günlük parolasından PBKDF2 (250.000 iterasyon) ile
+  türetilen bir anahtarla. Günlük parolası (site parolasından ayrı, ikinci
+  bir katman) hiçbir yerde saklanmıyor — sadece kilit açıkken bellekte.
+  Şifreli veri hem `localStorage`'da hem (varsa) senkronize edildiği her
+  yerde düz metin değil, base64 bir blob olarak duruyor.
+- Ortam değişkenlerinin hiçbiri istemciye (tarayıcıya gönderilen koda)
+  sızmıyor — hepsi sadece `server.js`/`vite.config.ts` (Node tarafı) içinde
+  okunuyor, build çıktısında aranıp doğrulandı.
+- Parola/sır karşılaştırmaları (`SITE_PASSWORD`, `CRON_SECRET`, oturum
+  imzası) sabit zamanlı (timing-safe) — `===` yerine
+  `crypto.timingSafeEqual` kullanılıyor.

@@ -7,6 +7,8 @@ export function Diary() {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [qText, setQText] = useState('');
+  const [qConfirmPass, setQConfirmPass] = useState('');
+  const [setupError, setSetupError] = useState<string | null>(null);
 
   const inputStyle: CSSProperties = {
     padding: '10px 12px',
@@ -43,40 +45,87 @@ export function Diary() {
     setEditingId(null);
   };
 
+  const passwordInputStyle: CSSProperties = {
+    width: 260,
+    padding: '13px 16px',
+    border: `1px solid ${colors.borderStrong}`,
+    background: colors.panel,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    letterSpacing: '0.2em',
+    textAlign: 'center',
+    outline: 'none',
+    color: colors.ink,
+  };
+
   if (!app.unlocked) {
+    const firstTimeSetup = !app.diarySecurityEnabled;
+
+    const handleSubmit = () => {
+      if (firstTimeSetup) {
+        if (app.pass.length < 4) {
+          setSetupError('Parola en az 4 karakter olmalı.');
+          return;
+        }
+        if (app.pass !== qConfirmPass) {
+          setSetupError('Parolalar eşleşmiyor.');
+          return;
+        }
+        setSetupError(null);
+        app.setupDiaryPassword(app.pass);
+      } else {
+        app.unlockDiaryWithPassword(app.pass);
+      }
+    };
+
     return (
       <div style={{ minHeight: '74vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 30, textAlign: 'center' }}>
         <div style={{ width: 34, height: 34, border: `1px solid ${colors.borderStrong}`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span style={{ width: 7, height: 7, background: colors.inkSoft, borderRadius: '50%' }} />
         </div>
         <h1 style={{ margin: 0, fontFamily: fonts.serif, fontSize: 34, fontWeight: 400, letterSpacing: '-0.015em', color: colors.ink }}>
-          Günlük kilitli
+          {firstTimeSetup ? 'Günlük parolası belirle' : 'Günlük kilitli'}
         </h1>
+        {firstTimeSetup && (
+          <p style={{ margin: 0, maxWidth: 320, fontSize: 13, lineHeight: 1.6, color: colors.inkSoft }}>
+            Bu parola günlük girişlerini şifrelemek için kullanılacak — site parolandan
+            ayrı, ikinci bir katman. Unutursan mevcut girişlere bir daha erişemezsin,
+            iyi not al.
+          </p>
+        )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
           <input
             type="password"
             value={app.pass}
             onChange={(e) => app.setPass(e.target.value)}
-            placeholder="••••••••"
-            style={{
-              width: 260,
-              padding: '13px 16px',
-              border: `1px solid ${colors.borderStrong}`,
-              background: colors.panel,
-              fontFamily: fonts.sans,
-              fontSize: 14,
-              letterSpacing: '0.2em',
-              textAlign: 'center',
-              outline: 'none',
-              color: colors.ink,
-            }}
+            placeholder="Parola"
+            autoComplete={firstTimeSetup ? 'new-password' : 'current-password'}
+            style={passwordInputStyle}
+            onKeyDown={(e) => e.key === 'Enter' && !firstTimeSetup && handleSubmit()}
           />
-          <div onClick={app.unlock} className="btn-dark" style={{ width: 260, padding: '12px 0', fontSize: 13, textAlign: 'center', cursor: 'pointer', borderRadius: 3 }}>
-            Aç
+          {firstTimeSetup && (
+            <input
+              type="password"
+              value={qConfirmPass}
+              onChange={(e) => setQConfirmPass(e.target.value)}
+              placeholder="Parolayı tekrar gir"
+              autoComplete="new-password"
+              style={passwordInputStyle}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+            />
+          )}
+          <div
+            onClick={app.diaryUnlocking ? undefined : handleSubmit}
+            className="btn-dark"
+            style={{ width: 260, padding: '12px 0', fontSize: 13, textAlign: 'center', cursor: app.diaryUnlocking ? 'default' : 'pointer', borderRadius: 3, opacity: app.diaryUnlocking ? 0.6 : 1 }}
+          >
+            {app.diaryUnlocking ? 'açılıyor…' : firstTimeSetup ? 'Parolayı kaydet' : 'Aç'}
           </div>
-          <div style={{ fontFamily: fonts.sans, fontSize: 10.5, color: colors.inkFaint, letterSpacing: '0.06em' }}>
-            son giriş · 27 Ağustos, 23:41
-          </div>
+          {(setupError || app.diaryUnlockError) && (
+            <div style={{ fontFamily: fonts.sans, fontSize: 11.5, color: '#B0554F' }}>
+              {setupError || app.diaryUnlockError}
+            </div>
+          )}
         </div>
       </div>
     );

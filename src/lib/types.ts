@@ -94,10 +94,25 @@ export interface ProgramAttachment {
   fileData?: string;
 }
 
+// Günlük girişindeki `text`, `diarySecurity` kurulmuşsa DÜZ METİN değil
+// AES-GCM ile şifrelenmiş bir blob'un base64'ü olarak saklanır (bkz.
+// src/lib/diaryCrypto.ts, PLAN.md Aşama 17 madde 3). Tip düzeyinde hâlâ
+// `string` — yorumu (şifreli mi düz mü) `diarySecurity.enabled` belirler.
 export interface DiaryEntryX {
   id: string;
   date: string;
   text: string;
+}
+
+// Günlük parolası kurulunca oluşturulur. `salt`, anahtar türetmede
+// (PBKDF2) kullanılır; `canary`, girilen parolanın doğruluğunu (gerçek
+// içeriği çözmeden) test etmek için bilinen bir metnin şifreli hâlidir.
+// Günlük parolası KENDİSİ hiçbir yerde saklanmaz — sadece tarayıcıda,
+// kilit açıkken, bellekte (CryptoKey olarak) tutulur.
+export interface DiarySecurity {
+  enabled: boolean;
+  salt: string;
+  canary: string;
 }
 
 export interface PoemX {

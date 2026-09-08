@@ -185,7 +185,7 @@ Zeynep'in isteği: Aşama 15'teki `compressImage()` sıkıştırması geçici bi
 
 ### Teknik notlar
 - **Dev/prod paritesi:** Cloudinary yüklemesi basit bir pass-through proxy olamaz (SDK sunucu tarafında imzalama yapıyor), bu yüzden `vite.config.ts`'e de aynı mantığı tekrarlayan küçük bir dev-only middleware eklendi (`uploadImageDevPlugin`) — böylece fotoğraf ekleme `npm run dev` sırasında da çalışıyor, sadece production'da test etmeye gerek yok. server.js ile vite.config.ts arasında küçük bir mantık tekrarı var (kabul edilebilir, iki dosya da zaten dev/prod ayrımını benzer şekilde yönetiyor).
-- **Kasıtlı güvenlik kararı:** `/api/upload-image` bir paylaşımlı sır (Telegram uç noktasındaki `CRON_SECRET` gibi) ile korunmuyor — çünkü tarayıcı normal kullanımda doğrudan bu uç noktaya istek atıyor ve istemci JS'ine gömülecek bir sır zaten herkes tarafından okunabilir olurdu, gerçek bir koruma sağlamazdı. Tek koruma: dosya boyutu sınırı (6MB) ve `data:image/` önekinin doğrulanması. Uygulama tek kullanıcılı olduğu ve gizli bir URL'de barındığı için kabul edilebilir bir risk.
+- ~~Kasıtlı güvenlik kararı: `/api/upload-image` bir paylaşımlı sır ile korunmuyordu...~~ — **artık geçerli değil, bkz. Aşama 17.** Aşama 17'deki site geneli oturum koruması sayesinde bu uç nokta (ve diğer tüm `/api/*` uç noktaları, GitHub Actions'ın çağırdıkları hariç) zaten oturum çerezi olmadan hiç çağrılamıyor.
 
 ## Aşama 14 — Test ve Yayına Hazırlık ✅
 - [x] Tüm modüllerde hover/tıklanabilirlik göstergelerinin (pointer cursor) tutarlı çalıştığını doğrula — tüm `onClick` alan elemanlar taranarak iki eksik bulundu ve düzeltildi: `LinkMenu.tsx` ve `DayPanel.tsx`'teki arka plan (backdrop) katmanları tıklanınca paneli kapatıyordu ama imleç normal okdu; artık `cursor: 'pointer'` eklendi
@@ -195,6 +195,43 @@ Zeynep'in isteği: Aşama 15'teki `compressImage()` sıkıştırması geçici bi
 
 ### Barındırma kararını etkileyecek teknik notlar
 - **Google Calendar senkronizasyonu (Aşama 9) geliştirmede sadece Vite dev-proxy ile çalışıyordu.** CORS yüzünden tarayıcı Google'ın iCal adresine doğrudan istek atamıyor. Aşama 13'te bunun için gerçek bir production çözümü kuruldu — detaylar Aşama 13'ün altında.
+
+## Aşama 17 — Güvenlik ✅
+**Öncelik/aciliyet notu:** Site artık `zdemir.tech` üzerinden herkese açık — bugüne kadar ertelenen güvenlik konuları (günlük şifrelemesi hariç zaten yoktu) aciliyetli hale geldi. Dört maddenin hepsi tamamlandı ve gerçek testlerle doğrulandı.
+
+### 1. Site geneli erişim koruması ✅
+- [x] Tek paylaşılan parola (`SITE_PASSWORD`, çoklu kullanıcı/hesap sistemi DEĞİL) — imzalı, stateless bir oturum çerezi (`mgp_session`, 30 gün, `HttpOnly` + `SameSite=Lax` + isteğin gerçekten https olup olmadığına göre `Secure`) ile hatırlanıyor. Oturum durumu sunucuda TUTULMUYOR (Render sık yeniden başladığı için bellek içi bir oturum listesi işe yaramazdı) — çerezin kendisi `SESSION_SECRET` ile HMAC imzalı; `SESSION_SECRET` değişirse tüm oturumlar aynı anda geçersiz olur.
+- [x] Koruma olmadan hiçbir sayfa veya API uç noktası erişilebilir değil (CRON_SECRET korumalı iki uç nokta hariç, aşağıya bakın) — `server.js`'in en başında, tüm route'lardan önce çalışan bir middleware bunu sağlıyor.
+- [x] IP başına 5 başarısız giriş denemesinden sonra 60 saniyelik kilit (bellek içi, tam bir çözüm değil ama otomatik deneme yapmayı pratik olmaktan çıkarıyor).
+- [x] Temel güvenlik başlıkları (`X-Frame-Options: DENY` — giriş formunun bir iframe'e gömülüp tıklama kaçırmaya açık olmaması için, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`) her yanıtta gönderiliyor.
+- Gerçek tarayıcı testiyle doğrulandı: yanlış parola reddediliyor, doğru parola oturum açıyor, sayfa yenilemede oturum kalıyor, 6. yanlış deneme 429 alıyor, güvenlik başlıkları giriş sayfasında da mevcut.
+
+### 2. API uç noktalarının korunması ✅
+- [x] `/api/discover/*`, `/api/upload-image`, `/api/calendar.ics` dahil TÜM API uç noktaları artık madde 1'deki oturum çerezi olmadan çağrılamıyor (401 döner) — Cloudinary/SerpApi/Telegram kotasının kimliği doğrulanmamış kişilerce tüketilmesi engellendi.
+- [x] `/api/notify/daily` ve `/api/discover/scan` İSTİSNA — bunlar GitHub Actions tarafından `CRON_SECRET` başlığıyla çağrılıyor (tarayıcı çerezi olamazlar), kendi sır kontrolleri zaten vardı ve hâlâ geçerli. Bu iki yolun listesi (`CRON_ONLY_PATHS`) oturum middleware'inde açıkça tanımlı.
+- [x] `CRON_SECRET` karşılaştırması da (parola karşılaştırmasıyla tutarlı olsun diye) sabit zamanlı hale getirildi.
+- Gerçek testle doğrulandı: oturumsuz `/api/discover/scan` (CRON_SECRET ile) hâlâ 200 dönüyor, oturumsuz diğer her şey 401.
+
+### 3. Günlük modülü gerçek şifreleme ✅
+- [x] Günlüğün sahte kilit ekranı gerçek bir korumaya çevrildi: kullanıcının belirlediği bir günlük parolası (site parolasından ayrı, ikinci bir katman) — ilk kurulumda parola + onay istenir, mevcut (Aşama 15'ten kalma düz metin) girişler o anda şifrelenir.
+- [x] Şifreleme gerçek: AES-GCM (Web Crypto API, tarayıcıda), anahtar günlük parolasından PBKDF2 (250.000 iterasyon, SHA-256) ile türetiliyor. Parolanın kendisi hiçbir yerde saklanmıyor — doğrulama, bilinen bir metnin ("canary") şifreli hâlini çözmeye çalışarak yapılıyor (yanlış anahtarla AES-GCM'in kimlik doğrulama etiketi uyuşmuyor, güvenilir bir "yanlış parola" sinyali).
+- [x] Günlük girişleri `localStorage`'da düz metin değil, şifreli (base64) olarak duruyor — gerçek localStorage içeriği okunarak doğrulandı.
+- [x] Kilit açıkken türetilen anahtar ve çözülmüş metinler SADECE bellekte (transient React state) — kilitlenince (manuel "kilitle" veya ekrandan çıkış) ikisi de atılıyor, sayfa yenilemesinde de kaybolur (kalıcı değil, kasıtlı).
+- Gerçek tarayıcı testiyle doğrulandı: ilk kurulum, parola uyuşmazlığı hatası, şifreli saklama (ham localStorage kontrolü), yeni giriş ekleme, kilitle/aç döngüsü, yanlış parola reddi, sayfa yenilemesinde tekrar kilitlenme.
+
+### 4. Genel açık taraması ✅
+- [x] `import.meta.env`/`process.env` taraması: hiçbir ortam değişkeni/sır `src/` altında (tarayıcıya giden kod) kullanılmıyor; derlenmiş `dist/` bundle'ında da hiçbir sır değeri veya env var adı bulunmuyor (grep ile doğrulandı).
+- [x] `dangerouslySetInnerHTML`, `eval`, `new Function` — hiçbiri kullanılmıyor.
+- [x] **Bulunan ve düzeltilen küçük bir tutarsızlık:** Home.tsx'teki "Keşfedilen programlar" linkleri (`p.link`, SerpApi'den gelen — düşük risk ama savunma amaçlı), Topics.tsx/CalendarScreen.tsx'teki kullanıcı linklerinin aksine `http` önek kontrolünden geçmiyordu. Tutarlılık için aynı korumayı ekledik (`p.link.startsWith('http') ? p.link : https://${p.link}`).
+- [x] `res.cookie(...)`'daki `secure` bayrağı başta `NODE_ENV === 'production'`e bakıyordu — Render'ın bunu her zaman doğru ayarlayacağı garanti değil. `req.secure`'a (Express'in `trust proxy` ile `X-Forwarded-Proto`'dan doğru hesapladığı) bakacak şekilde düzeltildi.
+- [x] Redis komutları (Upstash) her zaman ayrı dizi elemanları olarak gönderiliyor, string birleştirme yok — komut enjeksiyonu riski yok.
+- [x] `.gitignore`, derlenmiş `dist/` ve `.env.local` dahil tüm sır dosyalarını doğru şekilde dışlıyor — tüm oturum boyunca tekrar tekrar doğrulandı, hiçbir sır commit'e girmedi.
+- Rapor edilen ama KASITLI OLARAK değiştirilmeyen (düşük öncelik/kapsam dışı): site geneli oturumdan manuel "çıkış yap" (logout) butonu yok — 30 gün sonra kendiliğinden düşer, `SESSION_SECRET` değiştirilerek elle de zorlanabilir. `Content-Security-Policy` başlığı eklenmedi — Cloudinary/Google Fonts gibi harici kaynaklar kullanıldığı için dikkatli test gerektirir, bu aşamanın kapsamı dışında bırakıldı.
+
+### Zeynep'in yapması gerekenler
+- Render production ortam değişkenlerine `SITE_PASSWORD` (kendi belirleyeceği güçlü bir parola) ve `SESSION_SECRET` (rastgele bir sır) eklenmeli — **bunlar olmadan site PRODUCTION'DA KORUMASIZ kalır.**
+- `.env.local`'de şu an yer tutucu bir `SITE_PASSWORD` (`degistir-lutfen-2026`) ve test için üretilmiş bir `SESSION_SECRET` var — yerel geliştirmede kullanılabilir ama gerçek/production parolası bambaşka olmalı.
+- Günlüğe ilk girişte kendi belirleyeceğin bir günlük parolası istenecek (site parolasından farklı olabilir/olmalı) — bunu unutursan mevcut günlük girişlerine bir daha erişemezsin, arayüzde bu konuda uyarı var.
 
 ---
 **Not:** Her aşama bitince Zeynep'e kısa bir özet ver (ne yapıldı, hangi dosyalar değişti), sıradaki aşamaya geçmeden önce onay bekle.

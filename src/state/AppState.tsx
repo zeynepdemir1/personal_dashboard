@@ -19,6 +19,7 @@ import {
   VALID_SCREENS,
   type ChecklistItem,
   type DiaryEntryX,
+  type DiarySecurity,
   type ExtraLink,
   type ExtraProgram,
   type ExtraProject,
@@ -30,6 +31,7 @@ import {
   type Screen,
   type TopicOverride,
 } from '../lib/types';
+import { decryptText, deriveDiaryKey, encryptText, makeCanary, randomSalt, verifyCanary } from '../lib/diaryCrypto';
 
 function makeId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -66,6 +68,7 @@ interface PersistedState {
   projectOverrides: Record<number, ProjectOverride>;
   dayNotes: Record<number, DayNote[]>;
   diaryEntries: DiaryEntryX[];
+  diarySecurity: DiarySecurity | null;
   poemEntries: PoemX[];
   calView: 'week' | 'month';
   sidebarOpen: boolean;
@@ -86,6 +89,7 @@ function defaultPersisted(): PersistedState {
     projectOverrides: {},
     dayNotes: JSON.parse(JSON.stringify(SEED_DAY_NOTES)),
     diaryEntries: DIARY.map((d, i) => ({ id: `seed-${i}`, ...d })),
+    diarySecurity: null,
     poemEntries: POEMS.map((p, i) => ({ id: `seed-${i}`, ...p })),
     calView: 'week',
     sidebarOpen: true,
@@ -146,6 +150,10 @@ function loadPersisted(): PersistedState {
       extraPrograms: normalizeExtraPrograms(parsed.extraPrograms),
       extraProjects: normalizeExtraProjects(parsed.extraProjects),
       diaryEntries: Array.isArray(parsed.diaryEntries) ? parsed.diaryEntries : base.diaryEntries,
+      diarySecurity:
+        parsed.diarySecurity && typeof parsed.diarySecurity === 'object' && parsed.diarySecurity.enabled
+          ? parsed.diarySecurity
+          : null,
       poemEntries: Array.isArray(parsed.poemEntries) ? parsed.poemEntries : base.poemEntries,
       profileName: typeof parsed.profileName === 'string' && parsed.profileName.trim() ? parsed.profileName : base.profileName,
     };
@@ -193,8 +201,12 @@ export interface AppStateValue {
   unlocked: boolean;
   pass: string;
   setPass: (v: string) => void;
-  unlock: () => void;
   lock: () => void;
+  diarySecurityEnabled: boolean;
+  diaryUnlocking: boolean;
+  diaryUnlockError: string | null;
+  setupDiaryPassword: (password: string) => void;
+  unlockDiaryWithPassword: (password: string) => void;
 
   addingProgram: boolean;
   qProgram: string;
@@ -405,10 +417,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   // navigate()'i değil doğrudan hashchange'i tetikliyor, bu yüzden kilit
   // sıfırlama mantığı burada, screen değişimini izleyerek yapılıyor) kilit
   // tekrar kapansın. `unlocked` bilerek persisted değil — sayfa
-  // yenilenince de kilitli başlar.
+  // yenilenince de kilitli başlar. `diaryKey` (türetilmiş AES anahtarı) ve
+  // `diaryDecrypted` (çözülmüş görüntüleme kopyası) da SADECE bellekte —
+  // kilitlenince ikisi de atılıyor, şifreli veri persisted'de zaten duruyor.
   const [unlocked, setUnlocked] = useState(false);
+  const [diaryKey, setDiaryKey] = useState<CryptoKey | null>(null);
+  const [diaryDecrypted, setDiaryDecrypted] = useState<DiaryEntryX[]>([]);
+  const [diaryUnlocking, setDiaryUnlocking] = useState(false);
+  const [diaryUnlockError, setDiaryUnlockError] = useState<string | null>(null);
+  const [pass, setPass] = useState('');
   useEffect(() => {
-    if (screen !== 'diary') setUnlocked(false);
+    if (screen !== 'diary') {
+      setUnlocked(false);
+      setDiaryKey(null);
+      setDiaryDecrypted([]);
+      setDiaryUnlockError(null);
+      setPass('');
+    }
   }, [screen]);
 
   const [width, setWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1440));
@@ -421,7 +446,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [qProfileName, setQProfileName] = useState('');
-  const [pass, setPass] = useState('');
   const [addingProgram, setAddingProgram] = useState(false);
   const [qProgram, setQProgram] = useState('');
   const [qLink, setQLink] = useState('');
@@ -538,10 +562,66 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       unlocked,
       pass,
       setPass,
-      unlock: () => setUnlocked(true),
       lock: () => {
         setUnlocked(false);
         setPass('');
+        setDiaryKey(null);
+        setDiaryDecrypted([]);
+        setDiaryUnlockError(null);
+      },
+      diarySecurityEnabled: !!persisted.diarySecurity?.enabled,
+      diaryUnlocking,
+      diaryUnlockError,
+      setupDiaryPassword: (password: string) => {
+        const v = password.trim();
+        if (!v) return;
+        setDiaryUnlocking(true);
+        setDiaryUnlockError(null);
+        (async () => {
+          const salt = randomSalt();
+          const key = await deriveDiaryKey(v, salt);
+          const canary = await makeCanary(key);
+          // Bu ana kadar düz metin duran girişleri (Aşama 15'te CRUD
+          // eklenmişti ama şifreleme yoktu) şimdi şifreliyoruz — geriye
+          // dönük bir taşıma, elle bir migration adımı gerekmiyor.
+          const plainEntries = persistedRef.current.diaryEntries;
+          const encryptedEntries = await Promise.all(
+            plainEntries.map(async (d) => ({ ...d, text: await encryptText(key, d.text) })),
+          );
+          patch({ diarySecurity: { enabled: true, salt, canary }, diaryEntries: encryptedEntries });
+          setDiaryKey(key);
+          setDiaryDecrypted(plainEntries);
+          setUnlocked(true);
+          setDiaryUnlocking(false);
+          setPass('');
+        })();
+      },
+      unlockDiaryWithPassword: (password: string) => {
+        const v = password.trim();
+        const security = persistedRef.current.diarySecurity;
+        if (!v || !security) return;
+        setDiaryUnlocking(true);
+        setDiaryUnlockError(null);
+        (async () => {
+          const key = await deriveDiaryKey(v, security.salt);
+          const ok = await verifyCanary(key, security.canary);
+          if (!ok) {
+            setDiaryUnlocking(false);
+            setDiaryUnlockError('Yanlış parola.');
+            return;
+          }
+          const decrypted = await Promise.all(
+            persistedRef.current.diaryEntries.map(async (d) => ({
+              ...d,
+              text: (await decryptText(key, d.text)) ?? '(çözülemedi)',
+            })),
+          );
+          setDiaryKey(key);
+          setDiaryDecrypted(decrypted);
+          setUnlocked(true);
+          setDiaryUnlocking(false);
+          setPass('');
+        })();
       },
 
       addingProgram,
@@ -804,23 +884,37 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         }
       },
 
-      diaryEntries: persisted.diaryEntries,
+      // `diaryEntries` burada BİLEREK persisted.diaryEntries değil,
+      // `diaryDecrypted` — persisted'deki asıl kayıt her zaman şifreli,
+      // sadece kilit açıkken (diaryKey varken) çözülmüş kopyası bellekte
+      // tutuluyor ve buradan gösteriliyor.
+      diaryEntries: diaryDecrypted,
       addDiaryEntry: (text: string) => {
         const v = text.trim();
-        if (!v) return;
-        patch({
-          diaryEntries: [{ id: makeId('diary'), date: TODAY, text: v }, ...persistedRef.current.diaryEntries],
-        });
+        if (!v || !diaryKey) return;
+        const id = makeId('diary');
+        const key = diaryKey;
+        (async () => {
+          const encrypted = await encryptText(key, v);
+          patch({ diaryEntries: [{ id, date: TODAY, text: encrypted }, ...persistedRef.current.diaryEntries] });
+          setDiaryDecrypted((cur) => [{ id, date: TODAY, text: v }, ...cur]);
+        })();
       },
       updateDiaryEntry: (id: string, text: string) => {
         const v = text.trim();
-        if (!v) return;
-        patch({
-          diaryEntries: persistedRef.current.diaryEntries.map((d) => (d.id === id ? { ...d, text: v } : d)),
-        });
+        if (!v || !diaryKey) return;
+        const key = diaryKey;
+        (async () => {
+          const encrypted = await encryptText(key, v);
+          patch({
+            diaryEntries: persistedRef.current.diaryEntries.map((d) => (d.id === id ? { ...d, text: encrypted } : d)),
+          });
+          setDiaryDecrypted((cur) => cur.map((d) => (d.id === id ? { ...d, text: v } : d)));
+        })();
       },
       deleteDiaryEntry: (id: string) => {
         patch({ diaryEntries: persistedRef.current.diaryEntries.filter((d) => d.id !== id) });
+        setDiaryDecrypted((cur) => cur.filter((d) => d.id !== id));
       },
 
       poemEntries: persisted.poemEntries,
@@ -952,6 +1046,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       width,
       unlocked,
       pass,
+      diaryKey,
+      diaryDecrypted,
+      diaryUnlocking,
+      diaryUnlockError,
       addingProgram,
       qProgram,
       qLink,

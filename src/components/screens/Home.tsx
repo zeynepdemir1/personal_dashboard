@@ -256,7 +256,7 @@ export function Home() {
               app.discoveredPrograms.map((p) => (
                 <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingBottom: 10, borderBottom: '1px solid #F1E4E4' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-                    <a href={p.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13.5, lineHeight: 1.4 }}>
+                    <a href={p.link.startsWith('http') ? p.link : `https://${p.link}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13.5, lineHeight: 1.4 }}>
                       {p.title}
                     </a>
                     <span
