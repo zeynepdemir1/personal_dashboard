@@ -11,7 +11,7 @@ import { Projects } from './components/screens/Projects';
 import { CalendarScreen } from './components/screens/CalendarScreen';
 import { Poems } from './components/screens/Poems';
 import { Topics } from './components/screens/Topics';
-import { colors, fonts } from './lib/theme';
+import { colors, fonts, MOBILE_BREAKPOINT } from './lib/theme';
 
 const MODULE_LABELS: Record<string, string> = {
   growth: 'Akademik Gelişim',
@@ -26,7 +26,19 @@ const MODULE_LABELS: Record<string, string> = {
 
 function Shell() {
   const app = useApp();
+  const mobile = app.width < MOBILE_BREAKPOINT;
   const tight = app.width < 860;
+  // Sidebar.tsx'teki drawer genişliğiyle aynı hesap — mobilde sidebar artık
+  // bir overlay olduğu için (bkz. Sidebar.tsx) bu düğme onun kenarına
+  // oturmalı, açıkken içeriği yana itmiyor.
+  const mobileDrawerWidth = Math.min(Math.round(app.width * 0.8), 280);
+  const toggleLeft = mobile
+    ? app.sidebarOpen
+      ? mobileDrawerWidth - 14
+      : 14
+    : app.sidebarOpen
+      ? (tight ? 196 : 246)
+      : 14;
 
   return (
     <div
@@ -44,7 +56,7 @@ function Shell() {
         style={{
           position: 'fixed',
           top: 26,
-          left: app.sidebarOpen ? (tight ? 196 : 246) : 14,
+          left: toggleLeft,
           width: 28,
           height: 28,
           borderRadius: '50%',
@@ -54,7 +66,7 @@ function Shell() {
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          zIndex: 40,
+          zIndex: 95,
           color: colors.inkSoft,
           fontSize: 13,
           transition: 'left 0.15s ease',
@@ -69,7 +81,14 @@ function Shell() {
         style={{
           flex: 1,
           minWidth: 0,
-          padding: tight ? '36px 26px 80px' : '56px 56px 96px',
+          // Sabit konumlu sidebar-açma düğmesi (top:26, height:28 — yani
+          // y:26-54 arasını kaplıyor) dar/telefon genişliklerinde, dolgu
+          // küçüldükçe sayfanın ilk satırıyla (Ana Sayfa'da tarih başlığı,
+          // diğer ekranlarda "← Geri") YATAY olarak çakışıyordu. Kalıcı
+          // çözüm: dar genişliklerde üst dolguyu düğmenin altını temizleyecek
+          // kadar artırmak — böylece düğme içeriğin ÜSTÜNDEKİ boş alanda
+          // durur, hangi ekran/bileşen olursa olsun (tek tek yama gerekmez).
+          padding: mobile ? '70px 18px 72px' : tight ? '70px 26px 80px' : '56px 56px 96px',
           maxWidth: 1240,
         }}
       >

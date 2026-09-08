@@ -45,18 +45,25 @@ export function Growth() {
         </h1>
       </header>
 
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', borderTop: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}`, padding: '12px 0' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', borderTop: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}`, padding: '12px 0' }}>
         {filters.map((f, i) => (
           <div key={f} className="hover-row" style={pillStyle(i === 0)}>
             {f}
           </div>
         ))}
-        <div style={{ marginLeft: 'auto', fontFamily: fonts.sans, fontSize: 11, color: colors.inkSoft }}>42 not · 9 ay</div>
+        <div style={{ marginLeft: 'auto', fontFamily: fonts.sans, fontSize: 11, color: colors.inkSoft, whiteSpace: 'nowrap' }}>42 not · 9 ay</div>
       </div>
 
       {months.map((m) => (
         <section key={m.name} style={gridGrowth}>
-          <div style={{ position: 'sticky', top: 40, border: `1px solid ${colors.border}`, background: colors.panel, padding: '22px 22px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Sticky sadece masaüstündeki iki sütunlu düzende anlamlı (kart
+              sol sütunda sabit kalırken sağdaki uzun not listesi kayar).
+              Tek sütuna indiğinde (narrow) kart ve not listesi aynı
+              sütunda üst üste yığıldığı için sticky, kartın liste
+              kaymasının ÜSTÜNDE asılı kalmasına ve metinlerin iç içe
+              geçmesine yol açıyordu — mobilde normal (static) akışa
+              dönülüyor. */}
+          <div style={{ position: narrow ? 'static' : 'sticky', top: 40, border: `1px solid ${colors.border}`, background: colors.panel, padding: '22px 22px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
               <div style={{ fontFamily: fonts.serif, fontSize: 24, fontWeight: 500, color: colors.ink }}>{m.name}</div>
               <div style={{ fontFamily: fonts.sans, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.inkFainter }}>{m.count} not</div>

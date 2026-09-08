@@ -1,6 +1,6 @@
 import { useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useApp } from '../../state/AppState';
-import { colors, fonts, pillStyle, dayBlockStyle, gcalBlockStyle, HOUR_ROW_HEIGHT } from '../../lib/theme';
+import { colors, fonts, pillStyle, dayBlockStyle, gcalBlockStyle, HOUR_ROW_HEIGHT, MOBILE_BREAKPOINT } from '../../lib/theme';
 import { LINKS, PROGRAMS, TOPICS, AUG31_BLOCKS, timeToHour } from '../../lib/data';
 import { computeHomeStats, computeClosedTopicsThisMonth } from '../../lib/stats';
 import { daysLeftUntil, daysLeftColor, formatDaysLeft, formatMonthDay, parseDotDate } from '../../lib/dates';
@@ -437,6 +437,12 @@ export function Home() {
 
 function WeekView() {
   const app = useApp();
+  // 7 gün + saat sütunu, telefon genişliğinde orantısal (1fr) sütunlara
+  // sıkıştırılınca her gün ~40px'e düşüp tamamen okunaksız hale geliyordu
+  // (bkz. PLAN.md Aşama 18). Izgarayı küçültmek yerine sabit bir minimum
+  // genişlik veriyoruz ve sadece bu widget'ı yatay kaydırılabilir
+  // yapıyoruz — sayfanın geri kalanı yatayda kaymıyor, sadece takvim.
+  const mobile = app.width < MOBILE_BREAKPOINT;
   const weekDays = DAY_DEFS.map((d) => {
     const rawBlocks =
       d.dayNum === null
@@ -463,7 +469,20 @@ function WeekView() {
   });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '58px 1fr', gap: 0, border: `1px solid ${colors.border}`, background: colors.panel, borderRadius: 4, overflow: 'hidden', transition: 'opacity 0.15s ease' }}>
+    <div style={{ overflowX: mobile ? 'auto' : 'visible' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '58px 1fr',
+          gap: 0,
+          border: `1px solid ${colors.border}`,
+          background: colors.panel,
+          borderRadius: 4,
+          overflow: 'hidden',
+          transition: 'opacity 0.15s ease',
+          minWidth: mobile ? 700 : undefined,
+        }}
+      >
       <div />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: `1px solid ${colors.border}` }}>
         {weekDays.map((d, i) => (
@@ -507,6 +526,7 @@ function WeekView() {
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ import { classifyProgramRelevance, pingOllama, summarizeLearnEntry } from '../li
 import { dismissProgram, fetchPendingPrograms, fetchRelevantPrograms, markFilteredPrograms, type DiscoveredProgram } from '../lib/discover';
 import { formatMonthDay, referenceToday } from '../lib/dates';
 import { DEFAULT_PROFILE_NAME } from '../lib/profile';
+import { MOBILE_BREAKPOINT } from '../lib/theme';
 import {
   VALID_SCREENS,
   type ChecklistItem,
@@ -140,9 +141,16 @@ function normalizeExtraProjects(raw: unknown): ExtraProject[] {
 function loadPersisted(): PersistedState {
   const base = defaultPersisted();
   if (typeof window === 'undefined') return base;
+  // Telefon genişliğinde sidebar artık tam ekran bir overlay (bkz.
+  // Sidebar.tsx, PLAN.md Aşama 18) — `sidebarOpen` varsayılanı (true)
+  // masaüstü içindi. Bunu İLK RENDER'DA (bir effect'le SONRADAN düzeltmek
+  // yerine) burada hesaplıyoruz ki telefonda sayfa her açıldığında
+  // sidebar bir an görünüp kapanan bir "flaş" yapmasın — ilk boyama
+  // zaten kapalı gelsin.
+  const mobile = window.innerWidth < MOBILE_BREAKPOINT;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return base;
+    if (!raw) return mobile ? { ...base, sidebarOpen: false } : base;
     const parsed = JSON.parse(raw);
     return {
       ...base,
@@ -156,9 +164,10 @@ function loadPersisted(): PersistedState {
           : null,
       poemEntries: Array.isArray(parsed.poemEntries) ? parsed.poemEntries : base.poemEntries,
       profileName: typeof parsed.profileName === 'string' && parsed.profileName.trim() ? parsed.profileName : base.profileName,
+      sidebarOpen: mobile ? false : typeof parsed.sidebarOpen === 'boolean' ? parsed.sidebarOpen : base.sidebarOpen,
     };
   } catch {
-    return base;
+    return mobile ? { ...base, sidebarOpen: false } : base;
   }
 }
 

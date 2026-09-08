@@ -1,5 +1,6 @@
+import type { CSSProperties } from 'react';
 import { useApp } from '../state/AppState';
-import { colors, fonts, navItemStyle } from '../lib/theme';
+import { colors, fonts, navItemStyle, MOBILE_BREAKPOINT } from '../lib/theme';
 import { useOllamaStatus } from '../lib/ollama';
 import { initials } from '../lib/profile';
 import type { Screen } from '../lib/types';
@@ -20,6 +21,7 @@ const PERSONAL: { key: Screen; label: string }[] = [
 
 export function Sidebar() {
   const app = useApp();
+  const mobile = app.width < MOBILE_BREAKPOINT;
   const tight = app.width < 860;
   const ollama = useOllamaStatus();
 
@@ -34,44 +36,81 @@ export function Sidebar() {
     poems: String(app.poemEntries.length),
   };
 
-  return (
-    <aside
-      style={
-        app.sidebarOpen
-          ? {
-              width: tight ? 210 : 260,
-              flex: `0 0 ${tight ? 210 : 260}px`,
-              borderRight: `1px solid ${colors.border}`,
-              padding: '30px 22px 26px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 6,
-              position: 'sticky',
-              top: 0,
-              height: '100vh',
-              background: colors.sidebarBg,
-              transition: 'width 0.15s ease',
-            }
-          : {
-              width: 0,
-              flex: '0 0 0',
-              borderRight: 'none',
-              padding: 0,
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 6,
-              position: 'sticky',
-              top: 0,
-              height: '100vh',
-              background: colors.sidebarBg,
-              transition: 'width 0.15s ease',
-            }
+  // Telefon genişliğinde sidebar artık flex akışında yer kaplayıp içeriği
+  // yana itmiyor (bu, mobilde ekranın geri kalanının orantısız daralmasına
+  // yol açıyordu) — bunun yerine içeriğin ÜZERİNE kapanan sabit konumlu bir
+  // panel (drawer) + arkasında karartan bir backdrop. Kapalıyken ekran
+  // dışına kaydırılıyor (transform), DOM'dan hiç kaldırılmıyor ki geçiş
+  // animasyonu çalışsın.
+  // Mobilde bir sayfaya geçince drawer kendiliğinden kapanmalı — aksi
+  // halde kullanıcı gittiği sayfayı görmek için ayrıca kapatması gerekir.
+  const goTo = (screen: Screen) => {
+    app.navigate(screen);
+    if (mobile) app.toggleSidebar();
+  };
+
+  const mobileWidth = Math.min(Math.round(app.width * 0.8), 280);
+  const asideStyle: CSSProperties = mobile
+    ? {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        height: '100vh',
+        width: mobileWidth,
+        borderRight: `1px solid ${colors.border}`,
+        padding: '30px 22px 26px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        background: colors.sidebarBg,
+        zIndex: 90,
+        boxShadow: app.sidebarOpen ? '10px 0 32px rgba(61,43,46,0.18)' : 'none',
+        transform: app.sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+        transition: 'transform 0.2s ease',
       }
-    >
+    : app.sidebarOpen
+      ? {
+          width: tight ? 210 : 260,
+          flex: `0 0 ${tight ? 210 : 260}px`,
+          borderRight: `1px solid ${colors.border}`,
+          padding: '30px 22px 26px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
+          background: colors.sidebarBg,
+          transition: 'width 0.15s ease',
+        }
+      : {
+          width: 0,
+          flex: '0 0 0',
+          borderRight: 'none',
+          padding: 0,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
+          background: colors.sidebarBg,
+          transition: 'width 0.15s ease',
+        };
+
+  return (
+    <>
+      {mobile && app.sidebarOpen && (
+        <div
+          onClick={app.toggleSidebar}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(61,43,46,0.32)', zIndex: 80, cursor: 'pointer' }}
+        />
+      )}
+      <aside style={asideStyle}>
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <div
-          onClick={() => app.navigate('home')}
+          onClick={() => goTo('home')}
           className="nav-hover"
           style={navItemStyle(app.screen === 'home')}
         >
@@ -94,7 +133,7 @@ export function Sidebar() {
         {ACADEMIC.map((item) => (
           <div
             key={item.key}
-            onClick={() => app.navigate(item.key)}
+            onClick={() => goTo(item.key)}
             className="nav-hover"
             style={navItemStyle(app.screen === item.key)}
           >
@@ -121,7 +160,7 @@ export function Sidebar() {
         {PERSONAL.map((item) => (
           <div
             key={item.key}
-            onClick={() => app.navigate(item.key)}
+            onClick={() => goTo(item.key)}
             className="nav-hover"
             style={navItemStyle(app.screen === item.key)}
           >
@@ -259,6 +298,7 @@ export function Sidebar() {
           </div>
         )}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

@@ -32,6 +32,13 @@ export const fonts = {
   mono: "'IBM Plex Mono', monospace",
 };
 
+// Telefon genişlikleri (~375-430px) için ayrı bir eşik — `tight` (<860)
+// hâlâ tablet/dar masaüstü için "yan yana ama dar" davranışını korurken,
+// bunun altında sidebar tam ekran bir overlay'e dönüşüyor (bkz.
+// App.tsx/Sidebar.tsx, PLAN.md Aşama 18) çünkü içeriği yana itmek bu
+// genişlikte kullanılamaz hale geliyordu.
+export const MOBILE_BREAKPOINT = 640;
+
 export function pillStyle(active: boolean): CSSProperties {
   return {
     fontFamily: fonts.sans,

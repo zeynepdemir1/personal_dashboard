@@ -233,6 +233,19 @@ Zeynep'in isteği: Aşama 15'teki `compressImage()` sıkıştırması geçici bi
 - `.env.local`'de şu an yer tutucu bir `SITE_PASSWORD` (`degistir-lutfen-2026`) ve test için üretilmiş bir `SESSION_SECRET` var — yerel geliştirmede kullanılabilir ama gerçek/production parolası bambaşka olmalı.
 - Günlüğe ilk girişte kendi belirleyeceğin bir günlük parolası istenecek (site parolasından farklı olabilir/olmalı) — bunu unutursan mevcut günlük girişlerine bir daha erişemezsin, arayüzde bu konuda uyarı var.
 
+## Aşama 18 — Mobil Görünüm Düzeltmeleri ✅
+Zeynep telefonda test ederken 3 görsel hata buldu — hepsi gerçek mobil viewport emülasyonuyla (375-430px) doğrulanıp düzeltildi.
+
+- [x] **Akademik Gelişim'de kart/liste üst üste binmesi:** Aylık özet kartı (`position: sticky`) masaüstündeki iki sütunlu düzen için doğruydu — kart sol sütunda sabit kalırken sağdaki not listesi kayıyordu. Tek sütuna indiğinde (mobil) kart ve liste AYNI sütunda üst üste yığıldığı için sticky, kartın liste kaymasının üstünde asılı kalıp metinlerin iç içe geçmesine yol açıyordu. Düzeltme: `narrow` iken `position: static`'e dönülüyor (`Growth.tsx`).
+- [x] **Sidebar içeriği sıkıştırıyordu:** Sidebar `position: sticky` ile flex akışında gerçek yer kaplıyordu — telefon genişliğinde açılınca `main` (flex:1) orantısız daralıyordu. Yeni bir `MOBILE_BREAKPOINT` (640px) eşiğinde sidebar artık `position: fixed` bir overlay/drawer: içeriği hiç itmiyor, üzerine kapanıyor, arkasında karartan bir backdrop var, dışına tıklayınca veya bir sayfaya geçince kendiliğinden kapanıyor (`Sidebar.tsx`, `App.tsx`).
+  - Bulunan ek sorun: `sidebarOpen` varsayılanı (`true`) masaüstü içindi — telefonda ilk açılışta tüm ekranı kaplayan bir panelle karşılanmaya yol açıyordu. `loadPersisted()`'da ilk render'da doğrudan hesaplanacak şekilde düzeltildi (bir effect'le SONRADAN kapatmak yerine — bu, açılıp hemen kapanan görünür bir "flaş" yapıyordu).
+- [x] **Genel responsive tarama (375-430px, Ana Sayfa/Akademik Gelişim/Bir Şey Öğrendim/Linkler/Takvim + Projeler/Konular/Şiir/Günlük):**
+  - Akademik Gelişim'deki filtre pilleri (`Tümü/Kontrol/Gömülü/...`) satırı sarmıyordu, "42 not · 9 ay" ile birlikte 390px'te 33px taşıyordu — `flexWrap: 'wrap'` eklendi.
+  - Home'daki haftalık takvim ızgarası (7 gün + saat sütunu) mobilde `1fr` sütunlara sıkışınca her gün ~40px'e düşüp tamamen okunaksız oluyordu — ızgara küçültülmek yerine sabit minimum genişlik (700px) alıyor ve SADECE bu widget yatay kaydırılabilir (`overflowX: auto`); sayfanın geri kalanı yatayda kaymıyor (aylık görünüm zaten mobilde sorunsuzdu, dokunulmadı).
+  - iOS Safari, font-size'ı 16px altında olan bir metin alanına odaklanınca sayfayı otomatik yakınlaştırıyor — tasarımın çoğu alanı 12.5-15px kullandığı için `index.css`'e sadece ≤640px'te geçerli, `input/textarea/select` için 16px alt sınırı eklendi (masaüstü tasarım boyutlarına dokunulmadı).
+  - **Bulunan ek sorun (ekran görüntüsüyle yakalandı):** Sabit konumlu sidebar-açma düğmesi (üst-sol köşe), dar/telefon genişliklerinde dolgu küçüldükçe sayfanın İLK satırıyla (Ana Sayfa'da tarih başlığı "8 Eylül 2026 · Salı", diğer ekranlarda "← Geri") yatay olarak çakışıp metni kesiyordu. Kalıcı çözüm: tek tek her bileşeni yamalamak yerine, dar genişliklerde `main`'in üst dolgusu düğmenin altını (y:54) temizleyecek kadar artırıldı (`App.tsx`) — düğme artık içeriğin ÜSTÜNDEKİ boş alanda duruyor, hangi ekran olursa olsun.
+- Gerçek mobil viewport emülasyonuyla (iPhone 12, 375/390/414/430px) uçtan uca doğrulandı: hiçbir ekranda yatay taşma yok, sidebar drawer açılış/kapanış/otomatik-kapanma çalışıyor, masaüstü davranışı (sidebar sabit sütun, açık varsayılan) etkilenmedi, ekran görüntüleriyle görsel olarak da teyit edildi.
+
 ---
 **Not:** Her aşama bitince Zeynep'e kısa bir özet ver (ne yapıldı, hangi dosyalar değişti), sıradaki aşamaya geçmeden önce onay bekle.
 

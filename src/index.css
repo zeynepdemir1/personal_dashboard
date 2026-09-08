@@ -66,6 +66,20 @@ textarea {
   font-family: inherit;
 }
 
+/* iOS Safari, bir metin alanının font-size'ı 16px'in altındaysa odaklanınca
+   sayfayı otomatik yakınlaştırıyor (bkz. PLAN.md Aşama 18) — bileşenlerin
+   çoğu tasarım gereği daha küçük font-size kullanıyor (12.5-15px), bunların
+   hepsini tek tek değiştirmek yerine sadece telefon genişliğinde global
+   bir alt sınır uyguluyoruz; masaüstündeki tasarım font boyutlarına
+   dokunmuyor. */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* Hover utility classes — the design's inline `style-hover` interactions,
    reproduced with real CSS since React has no equivalent shorthand. */
 .hover-row:hover {
