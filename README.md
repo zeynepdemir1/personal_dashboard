@@ -22,11 +22,15 @@ belgeler.
 
 ## Ekran görüntüleri
 
-> **Not:** Bu bölüme canlı siteden (zdemir.tech, giriş yaptıktan sonra) Ana
-> Sayfa, Akademik Gelişim, Takvim ve Program Keşfi ekranlarının gerçek
-> ekran görüntüleri eklenecek. Şu an bu görüntüler henüz alınamadı (tarayıcı
-> otomasyon aracına bu oturumda erişim yoktu) — bir sonraki oturumda,
-> `/docs` klasörüne kaydedilip buraya gömülecek.
+Canlı siteden (zdemir.tech, giriş yapıldıktan sonra), gerçek veriyle.
+
+| Ana Sayfa | Akademik Gelişim |
+|---|---|
+| ![Ana Sayfa](docs/ana-sayfa.jpg) | ![Akademik Gelişim](docs/akademik-gelisim.jpg) |
+
+| Takvim | Program Keşfi |
+|---|---|
+| ![Takvim](docs/takvim.jpg) | ![Program Keşfi](docs/program-kesfi.jpg) |
 
 ## Özellikler
 
