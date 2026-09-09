@@ -86,10 +86,16 @@ staj ilanları — bkz. `server.js` → `DISCOVER_KEYWORDS`) haftalık olarak
 SerpApi üzerinden otomatik web taraması yapılır, sonuçlar Upstash Redis'te
 saklanır ve daha önce görülenler tekrar gösterilmez. Profil filtresi
 (kullanıcının mühendislik disiplinine alakasız sonuçları — ör. maden,
-inşaat — eleme) tarama anında değil, **uygulama Ollama'nın erişilebilir
-olduğu bir cihazda açıldığında** yerel modelle yapılır; alakalı bulunan
-yeni sonuçlar hem Ana Sayfa'da listelenir hem tek bir toplu Telegram
-mesajıyla bildirilir.
+inşaat — eleme), aynı zamanda son başvuru tarihi ve kısa bir açıklama
+çıkarımı, tarama anında değil, **uygulama Ollama'nın erişilebilir olduğu
+bir cihazda açıldığında** yerel modelle yapılır. Süresi geçmiş sonuçlar
+otomatik olarak elenir. Sol menüdeki kendi sayfasında kategoriye
+(hackathon/TÜBİTAK/Teknofest/staj) göre gruplanmış olarak, Ana Sayfa'da
+ise tarihe göre sıralı, dörderli bir carousel olarak gösterilir. Her
+sonucun yanında bir "Takip et" aksiyonu var — tıklanınca o sonuç, elle
+tarih/not girmeden, Program Takvimi'ne gerçek bir kayıt olarak eklenir.
+Yeni + alakalı bulunan sonuçlar tek bir toplu Telegram mesajıyla da
+bildirilir.
 
 ### Takvim (Ana Sayfa)
 Haftalık (saat bazlı, ders/etkinlik blokları) ve aylık (gün başına
@@ -98,6 +104,12 @@ etkinlikler salt-okunur olarak senkronize edilir ve yerel notlardan
 görsel olarak ayrılır (bkz.
 [Google Calendar salt-okunur kararı](#mimari-karar-2-google-calendar-salt-okunur)).
 Bir güne tıklanınca not/ders eklenebilen bir detay paneli açılır.
+
+### Profil
+Sol menünün altındaki profil kartından ad/soyad ve bir profil fotoğrafı
+(Cloudinary'de saklanır, aynı yükleme akışı diğer fotoğraflarla ortak)
+düzenlenebilir. Aynı yerden **çıkış yap** — oturum çerezini temizler,
+tekrar site parolası sorar.
 
 ## Teknik mimari
 
@@ -109,16 +121,27 @@ Bir güne tıklanınca not/ders eklenebilen bir detay paneli açılır.
   geneli oturum korumasını uygular, ve tarayıcının doğrudan
   erişemeyeceği dış servislere (Google Calendar, Cloudinary, SerpApi,
   Telegram, Upstash) vekil (proxy) olarak görev yapar.
-- **Kalıcı veri:** Kullanıcının kendi içeriğinin (notlar, günlük, proje
-  fikirleri vb.) TAMAMI tarayıcının `localStorage`'ında — merkezi bir
-  veritabanı yok. **İstisna:** Program Keşfi'nin bulduğu sonuçlar (bkz.
-  yukarı) **Upstash Redis**'te saklanıyor, çünkü bu özellik tarayıcı hiç
-  açık değilken (GitHub Actions ile) çalışabilmeli.
-- **Görsel depolama:** Fotoğraflar **Cloudinary**'nin ücretsiz katmanında;
-  `localStorage`'da sadece dönen URL duruyor.
+- **Kalıcı veri — hangi veri nerede duruyor:**
+  | Veri | Nerede | Neden |
+  |---|---|---|
+  | Akademik Gelişim, Bir Şey Öğrendim, Günlük (şifreli), Linkler, Proje Fikirleri, Araştırılacak Konular, Şiir, profil adı, "Takip et" ile eklenen program kayıtları | Tarayıcının **`localStorage`**'ı | Kişisel veri — merkezi bir sunucuya hiç gitmiyor, tamamen cihazda kalıyor |
+  | Program Keşfi'nin taradığı/bulduğu sonuçlar | **Upstash Redis** (sunucu tarafı) | Tarayıcı hiç açık değilken (GitHub Actions taraması) yazılabilmesi/okunabilmesi gerekiyor — `localStorage`'a bu mümkün değil |
+  | Fotoğraflar (proje/konu/profil) | **Cloudinary** | `localStorage`'a sığmayacak kadar büyük olabiliyorlar (bkz. Aşama 15/16); `localStorage`'da sadece dönen URL duruyor |
+
+  Bunun pratik sonucu: `localStorage` tarayıcıya özel olduğu için, aynı
+  siteye başka bir tarayıcı/cihazdan girildiğinde kişisel içerik (notlar,
+  günlük, linkler vb.) KARŞI TARAFTA GÖRÜNMEZ — her cihazın kendi
+  `localStorage`'ı bağımsızdır. Program Keşfi sonuçları ve fotoğraflar
+  bu kuralın istisnası, çünkü onlar zaten sunucu tarafında (Upstash/
+  Cloudinary) tutuluyor, cihaza bağlı değil.
 - **Barındırma:** **Render** (Web Service/Node) — bkz.
   [Deployment](#deployment).
 - **Yerel AI:** **Ollama** (`llama3.1:8b`) — bkz. aşağıdaki mimari karar.
+- **Görsel dekorasyon:** Sol menüde, boş alanda, sabit bir setten
+  rastgele seçilip zaman zaman değişen düşük opaklıklı bir fotoğraf
+  (`public/backgrounds/`) — sade tasarımı bozmayacak şekilde. Şu an
+  Zeynep'in kendi seçtiği sabit bir set; otomatik/AI üretilen görsellere
+  geçiş PLAN.md'de ayrı bir gelecek aşaması olarak not edildi.
 
 ### Mimari Karar 1: Yerel AI (Ollama)
 Özetleme ve profil filtresi için bir bulut API'si (OpenAI, Anthropic vb.)
@@ -222,10 +245,12 @@ Telegram/SerpApi için sunucu tarafı vekil (proxy) görevi görüyor.
   ayarından eklenip, alan adı sağlayıcısında (ör. bir DNS panelinde)
   belirtilen CNAME/A kaydı girilerek bağlandı — DNS doğrulaması birkaç
   saat sürebiliyor.
-- İki **GitHub Actions** workflow'u (`.github/workflows/`) production
+- Üç **GitHub Actions** workflow'u (`.github/workflows/`) production
   sunucusundaki zamanlanmış görevleri tetikliyor: günlük Telegram
-  bildirimi ve haftalık Program Keşfi taraması. Bunların çalışması için
-  GitHub repo secrets'a `CRON_SECRET` ve `APP_URL` eklenmesi gerekiyor.
+  bildirimi, haftalık Program Keşfi taraması ve Render'ı uykuya
+  düşürmeyen 10 dakikalık keep-alive ping'i. İlk ikisinin çalışması için
+  GitHub repo secrets'a `CRON_SECRET` ve `APP_URL` eklenmesi gerekiyor;
+  keep-alive sadece `APP_URL`'i kullanır.
 
 ## Sınırlamalar / Bilinen Kısıtlar
 
@@ -235,24 +260,28 @@ Telegram/SerpApi için sunucu tarafı vekil (proxy) görevi görüyor.
   bilgisayardan uygulama açıldığında işler; bekleyen içerik bir sonraki
   o cihazdan açılışa kadar "işlenmemiş" kalır.
 - **Render'ın ücretsiz planı boşta kalınca uyur** — bir süre trafik
-  almayan servis "uykuya" geçer, sonraki isteğin yanıtı gecikebilir
-  (30-60 saniyeye kadar). GitHub Actions workflow'ları bu yüzden yüksek
-  timeout + retry ile yazıldı.
+  almayan servis "uykuya" geçer ve uyanırken kendi markalı bir ekran
+  gösterir. Bunu tamamen ortadan kaldırmak için bir GitHub Actions
+  workflow'u (`keep-alive.yml`) her 10 dakikada bir siteye hafif bir
+  istek atıp servisi hiç uyutmuyor. Bu workflow bir sebeple çalışmazsa
+  (ör. GitHub Actions kesintisi) site yine de uyuyabilir — GitHub
+  Actions workflow'ları bu yüzden ayrıca yüksek timeout + retry ile
+  yazıldı.
 - **Google Calendar entegrasyonu tek yönlü (salt-okunur)** — uygulamadan
   Google Calendar'a not/ders eklenemez, sadece Google Calendar'daki
   etkinlikler uygulamada görüntülenir.
-- **Kullanıcının verisi merkezi bir veritabanında değil** — `localStorage`
-  tarayıcıya özel olduğu için, aynı hesaba farklı bir tarayıcı/cihazdan
-  girildiğinde eklenen notlar/girişler karşı tarafta görünmez (Program
-  Keşfi sonuçları ve fotoğraflar hariç — onlar sunucu tarafında/Cloudinary'de).
+- **Kullanıcının kişisel verisi merkezi bir veritabanında değil,
+  `localStorage`'da** — bkz. yukarıdaki "hangi veri nerede duruyor"
+  tablosu. Pratik sonucu: farklı bir tarayıcı/cihazdan girildiğinde
+  kişisel notlar/girişler karşı tarafta görünmez.
 - **Telegram bildirimleri sınırlı bilgiyle çalışır** — sunucunun
   kullanıcının `localStorage`'ındaki kişisel verisine erişimi olmadığı
   için, günlük bildirim sadece statik/genel program listesini raporlar.
 - **Program Keşfi ayda 250 sorguluk ücretsiz SerpApi kotasıyla sınırlı** —
   haftalık taramalar bunun çok altında kalıyor ama aşırı sık manuel
   tetiklemeler kotayı tüketebilir.
-- **Site geneli oturum stateless** — 30 gün sonra kendiliğinden düşer,
-  manuel bir "çıkış yap" butonu yok (bkz. PLAN.md Aşama 17).
+- **Site geneli oturum stateless** — 30 gün sonra kendiliğinden düşer
+  (veya profil menüsünden manuel "çıkış yap" ile hemen).
 
 ## Güvenlik
 

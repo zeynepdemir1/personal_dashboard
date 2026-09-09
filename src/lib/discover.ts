@@ -10,6 +10,12 @@ export interface DiscoveredProgram {
   keyword: string;
   category: string;
   foundAt: string;
+  // Aşağıdaki ikisi Ollama'nın gecikmeli kuyrukta ürettiği alanlar
+  // (bkz. src/lib/ollama.ts → analyzeDiscoveredProgram) — filtrelenmeden
+  // önce (durum "unfiltered") her ikisi de null'dur.
+  deadline: string | null; // DD.MM.YYYY
+  description: string | null;
+  followedProgramId?: string; // "Takip et" ile Program Takvimi'ne eklendiyse oradaki kaydın id'si
 }
 
 export async function fetchPendingPrograms(): Promise<DiscoveredProgram[]> {
@@ -34,7 +40,9 @@ export async function fetchRelevantPrograms(): Promise<DiscoveredProgram[]> {
   }
 }
 
-export async function markFilteredPrograms(results: { id: string; relevant: boolean }[]): Promise<void> {
+export async function markFilteredPrograms(
+  results: { id: string; relevant: boolean; deadline: string | null; description: string | null }[],
+): Promise<void> {
   if (results.length === 0) return;
   try {
     await fetch('/api/discover/mark-filtered', {

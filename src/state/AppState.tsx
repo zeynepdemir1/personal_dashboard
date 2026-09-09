@@ -11,7 +11,7 @@ import {
 import { makeLearnEntry, type LearnEntry } from '../lib/learn';
 import { deriveTitleFromUrl } from '../lib/url';
 import { fetchGoogleCalendarEvents, type GCalEvent, type GCalSyncStatus } from '../lib/googleCalendar';
-import { classifyProgramRelevance, pingOllama, summarizeLearnEntry } from '../lib/ollama';
+import { analyzeDiscoveredProgram, pingOllama, summarizeLearnEntry } from '../lib/ollama';
 import { dismissProgram, fetchPendingPrograms, fetchRelevantPrograms, markFilteredPrograms, type DiscoveredProgram } from '../lib/discover';
 import { formatMonthDay, referenceToday } from '../lib/dates';
 import { DEFAULT_PROFILE_NAME } from '../lib/profile';
@@ -36,6 +36,21 @@ import { decryptText, deriveDiaryKey, encryptText, makeCanary, randomSalt, verif
 
 function makeId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Linkler kartındaki "Linke git / Detayları gör" menüsü için — "Detayları
+// gör" eskiden hiçbir şey yapmıyordu (bkz. PLAN.md Aşama 19 madde 1); artık
+// kartın tüm alanlarını (kategori, tarih, not, etiketler) gösteren bir
+// detay görünümüne açılıyor, bu yüzden menü artık sadece title/url değil
+// tüm link kaydını taşıyor.
+interface LinkMenuData {
+  title: string;
+  url: string;
+  kind: string;
+  kindColor: string;
+  date: string;
+  note: string;
+  tags: string[];
 }
 
 // Statik proje/program referansları "static:<index>" ya da "extra:<id>"
@@ -74,6 +89,7 @@ interface PersistedState {
   calView: 'week' | 'month';
   sidebarOpen: boolean;
   profileName: string;
+  profilePhoto: string | null;
 }
 
 function defaultPersisted(): PersistedState {
@@ -95,6 +111,7 @@ function defaultPersisted(): PersistedState {
     calView: 'week',
     sidebarOpen: true,
     profileName: DEFAULT_PROFILE_NAME,
+    profilePhoto: null,
   };
 }
 
@@ -164,6 +181,7 @@ function loadPersisted(): PersistedState {
           : null,
       poemEntries: Array.isArray(parsed.poemEntries) ? parsed.poemEntries : base.poemEntries,
       profileName: typeof parsed.profileName === 'string' && parsed.profileName.trim() ? parsed.profileName : base.profileName,
+      profilePhoto: typeof parsed.profilePhoto === 'string' ? parsed.profilePhoto : null,
       sidebarOpen: mobile ? false : typeof parsed.sidebarOpen === 'boolean' ? parsed.sidebarOpen : base.sidebarOpen,
     };
   } catch {
@@ -198,6 +216,8 @@ export interface AppStateValue {
   toggleProfile: () => void;
 
   profileName: string;
+  profilePhoto: string | null;
+  setProfilePhoto: (url: string) => void;
   editingProfile: boolean;
   qProfileName: string;
   setQProfileName: (v: string) => void;
@@ -309,15 +329,18 @@ export interface AppStateValue {
   addDayPanelItem: () => void;
   removeDayNote: (day: number, id: string) => void;
 
-  linkMenu: { title: string; url: string } | null;
-  openLinkMenu: (title: string, url: string) => void;
+  linkMenu: LinkMenuData | null;
+  openLinkMenu: (link: LinkMenuData) => void;
   closeLinkMenu: () => void;
+  linkDetailOpen: boolean;
+  showLinkDetails: () => void;
 
   gcalStatus: GCalSyncStatus;
   gcalEvents: GCalEvent[];
 
   discoveredPrograms: DiscoveredProgram[];
   dismissDiscoveredProgram: (id: string) => void;
+  followDiscoveredProgram: (program: DiscoveredProgram) => void;
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -471,7 +494,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [dayPanel, setDayPanel] = useState<number | null>(null);
   const [dayPanelInput, setDayPanelInput] = useState('');
   const [dayPanelTime, setDayPanelTime] = useState('');
-  const [linkMenu, setLinkMenu] = useState<{ title: string; url: string } | null>(null);
+  const [linkMenu, setLinkMenu] = useState<LinkMenuData | null>(null);
+  const [linkDetailOpen, setLinkDetailOpen] = useState(false);
 
   const [gcalStatus, setGcalStatus] = useState<GCalSyncStatus>('unconfigured');
   const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
@@ -515,12 +539,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (cancelled || !ok) return;
       const pending = await fetchPendingPrograms();
       if (cancelled || pending.length === 0) return;
-      const results: { id: string; relevant: boolean }[] = [];
+      const results: { id: string; relevant: boolean; deadline: string | null; description: string | null }[] = [];
       for (const item of pending) {
         if (cancelled) return;
-        const relevant = await classifyProgramRelevance(item.title, item.snippet);
-        if (relevant === null) continue; // belirsiz/başarısız — filtrelenmedi durumunda kalsın, tekrar denenir
-        results.push({ id: item.id, relevant });
+        const analysis = await analyzeDiscoveredProgram(item.title, item.snippet);
+        if (analysis === null) continue; // belirsiz/başarısız — filtrelenmedi durumunda kalsın, tekrar denenir
+        results.push({ id: item.id, relevant: analysis.relevant, deadline: analysis.deadline, description: analysis.description });
       }
       if (cancelled || results.length === 0) return;
       await markFilteredPrograms(results);
@@ -537,6 +561,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     dismissProgram(id);
   };
 
+  // "Takip et" (PLAN.md Aşama 19 madde 3): keşfedilen sonucu, kullanıcı
+  // elle tarih/not girmeden, Program Takvimi'ne gerçek bir kayıt olarak
+  // ekler (elde varsa Ollama'nın çıkardığı son başvuru tarihiyle, notu da
+  // Ollama'nın ürettiği açıklamayla dolduruyor — sonradan elle
+  // düzenlenebilir). Takip edilen sonuç Program Keşfi listesinden de
+  // kalkar (artık Program Takvimi'nde yaşıyor, iki yerde tekrar etmesin).
+  const followDiscoveredProgram = (program: DiscoveredProgram) => {
+    patch({
+      extraPrograms: [
+        ...persistedRef.current.extraPrograms,
+        { id: makeId('program'), title: program.title, date: program.deadline || TODAY, note: program.description || '', link: program.link },
+      ],
+    });
+    setDiscoveredPrograms((cur) => cur.filter((p) => p.id !== program.id));
+    dismissProgram(program.id);
+  };
+
   const value: AppStateValue = useMemo(
     () => ({
       screen,
@@ -551,6 +592,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       toggleProfile: () => setProfileOpen((v) => !v),
 
       profileName: persisted.profileName,
+      profilePhoto: persisted.profilePhoto,
+      setProfilePhoto: (url: string) => patch({ profilePhoto: url }),
       editingProfile,
       qProfileName,
       setQProfileName,
@@ -1035,14 +1078,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       },
 
       linkMenu,
-      openLinkMenu: (title: string, url: string) => setLinkMenu({ title, url }),
-      closeLinkMenu: () => setLinkMenu(null),
+      openLinkMenu: (link: LinkMenuData) => {
+        setLinkMenu(link);
+        setLinkDetailOpen(false);
+      },
+      closeLinkMenu: () => {
+        setLinkMenu(null);
+        setLinkDetailOpen(false);
+      },
+      linkDetailOpen,
+      showLinkDetails: () => setLinkDetailOpen(true),
 
       gcalStatus,
       gcalEvents,
 
       discoveredPrograms,
       dismissDiscoveredProgram,
+      followDiscoveredProgram,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -1076,6 +1128,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       dayPanelInput,
       dayPanelTime,
       linkMenu,
+      linkDetailOpen,
       gcalStatus,
       gcalEvents,
       discoveredPrograms,

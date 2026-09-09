@@ -1,7 +1,7 @@
 import { useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useApp } from '../../state/AppState';
 import { colors, fonts, pillStyle, dayBlockStyle, gcalBlockStyle, HOUR_ROW_HEIGHT, MOBILE_BREAKPOINT } from '../../lib/theme';
-import { LINKS, PROGRAMS, TOPICS, AUG31_BLOCKS, timeToHour } from '../../lib/data';
+import { LINKS, PROGRAMS, TOPICS, AUG31_BLOCKS, timeToHour, TODAY } from '../../lib/data';
 import { computeHomeStats, computeClosedTopicsThisMonth } from '../../lib/stats';
 import { daysLeftUntil, daysLeftColor, formatDaysLeft, formatMonthDay, parseDotDate } from '../../lib/dates';
 import { SEED_LEARN_ENTRIES } from '../../lib/learn';
@@ -125,7 +125,16 @@ export function Home() {
   const homeLinks = [...app.extraLinks, ...LINKS].slice(0, 3).map((l) => ({
     title: l.title,
     kind: l.kind || 'Link',
-    open: () => app.openLinkMenu(l.title, l.url),
+    open: () =>
+      app.openLinkMenu({
+        title: l.title,
+        url: l.url || '',
+        kind: l.kind || 'Link',
+        kindColor: l.kindColor || colors.inkSoft,
+        date: l.date || TODAY,
+        note: l.note || '',
+        tags: l.tags || [],
+      }),
   }));
   const homeProjectViews = buildProjectViews(app.extraProjects, app.projectOverrides);
   const homeProjects = homeProjectViews.slice(0, 3);
@@ -243,35 +252,7 @@ export function Home() {
             </div>
           )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8, paddingTop: 16, borderTop: `1px dashed ${colors.borderStrong}` }}>
-            <div style={{ fontFamily: fonts.sans, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.inkFaint }}>
-              Keşfedilen programlar
-            </div>
-            {app.discoveredPrograms.length === 0 ? (
-              <div style={{ fontSize: 12.5, lineHeight: 1.6, color: colors.inkFaint, fontStyle: 'italic' }}>
-                Henüz yeni bir şey bulunamadı — periyodik tarama ve yerel modelin profil
-                filtresi tamamlanınca burada listelenecek.
-              </div>
-            ) : (
-              app.discoveredPrograms.map((p) => (
-                <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingBottom: 10, borderBottom: '1px solid #F1E4E4' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-                    <a href={p.link.startsWith('http') ? p.link : `https://${p.link}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13.5, lineHeight: 1.4 }}>
-                      {p.title}
-                    </a>
-                    <span
-                      onClick={() => app.dismissDiscoveredProgram(p.id)}
-                      className="text-hover-red"
-                      style={{ fontSize: 10.5, color: colors.placeholderText, cursor: 'pointer', flex: '0 0 auto' }}
-                    >
-                      gizle
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 12, color: colors.inkSoft, lineHeight: 1.55 }}>{p.snippet}</div>
-                </div>
-              ))
-            )}
-          </div>
+          <DiscoveredProgramsWidget />
         </div>
       </section>
 
@@ -431,6 +412,86 @@ export function Home() {
 
         {app.calView === 'week' ? <WeekView /> : <MonthView />}
       </section>
+    </div>
+  );
+}
+
+// PLAN.md Aşama 19 madde 2: Ana sayfadaki widget artık hepsini alt alta
+// listelemiyor — dörderli gruplar halinde, oklarla gezilebilen bir
+// carousel. Tarihe göre sıralı (bilinen son başvuru tarihi olanlar önce,
+// en yakın tarih en üstte; tarihi bilinmeyenler en sona, bulunma
+// tarihine göre).
+function DiscoveredProgramsWidget() {
+  const app = useApp();
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 4;
+
+  const sorted = [...app.discoveredPrograms].sort((a, b) => {
+    const da = a.deadline ? parseDotDate(a.deadline) : null;
+    const db = b.deadline ? parseDotDate(b.deadline) : null;
+    if (da && db) return da.getTime() - db.getTime();
+    if (da) return -1;
+    if (db) return 1;
+    return a.foundAt < b.foundAt ? 1 : -1;
+  });
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const clampedPage = Math.min(page, totalPages - 1);
+  const pageItems = sorted.slice(clampedPage * PAGE_SIZE, clampedPage * PAGE_SIZE + PAGE_SIZE);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8, paddingTop: 16, borderTop: `1px dashed ${colors.borderStrong}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontFamily: fonts.sans, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.inkFaint }}>
+          Senin İçin Bulduklarımız
+        </div>
+        {sorted.length > PAGE_SIZE && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
+              onClick={() => clampedPage > 0 && setPage(clampedPage - 1)}
+              style={{ fontSize: 13, color: clampedPage > 0 ? colors.inkSoft : colors.borderStrong, cursor: clampedPage > 0 ? 'pointer' : 'default' }}
+            >
+              ‹
+            </span>
+            <span style={{ fontFamily: fonts.sans, fontSize: 10, color: colors.inkFainter }}>
+              {clampedPage + 1}/{totalPages}
+            </span>
+            <span
+              onClick={() => clampedPage < totalPages - 1 && setPage(clampedPage + 1)}
+              style={{ fontSize: 13, color: clampedPage < totalPages - 1 ? colors.inkSoft : colors.borderStrong, cursor: clampedPage < totalPages - 1 ? 'pointer' : 'default' }}
+            >
+              ›
+            </span>
+          </div>
+        )}
+      </div>
+      {sorted.length === 0 ? (
+        <div style={{ fontSize: 12.5, lineHeight: 1.6, color: colors.inkFaint, fontStyle: 'italic' }}>
+          Henüz yeni bir şey bulunamadı — periyodik tarama ve yerel modelin profil
+          filtresi tamamlanınca burada listelenecek.
+        </div>
+      ) : (
+        pageItems.map((p) => (
+          <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingBottom: 10, borderBottom: '1px solid #F1E4E4' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+              <a href={p.link.startsWith('http') ? p.link : `https://${p.link}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13.5, lineHeight: 1.4 }}>
+                {p.title}
+              </a>
+              {p.deadline && (
+                <span style={{ fontFamily: fonts.sans, fontSize: 10, color: colors.rose, whiteSpace: 'nowrap', flex: '0 0 auto' }}>{p.deadline}</span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: colors.inkSoft, lineHeight: 1.55 }}>{p.description || p.snippet}</div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <span onClick={() => app.followDiscoveredProgram(p)} className="text-hover-rose" style={{ fontSize: 10.5, color: colors.rose, cursor: 'pointer' }}>
+                + Takip et
+              </span>
+              <span onClick={() => app.dismissDiscoveredProgram(p.id)} className="text-hover-red" style={{ fontSize: 10.5, color: colors.placeholderText, cursor: 'pointer' }}>
+                gizle
+              </span>
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }

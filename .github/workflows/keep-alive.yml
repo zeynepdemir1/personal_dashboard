@@ -1,0 +1,26 @@
+name: Render'ı uyanık tut (keep-alive)
+
+# Render'ın ücretsiz planı 15 dakika hareketsizlikten sonra uykuya geçiyor
+# ve uyanırken kendi markalı "cold start" ekranını gösteriyor (bkz.
+# PLAN.md Aşama 19 madde 4) — bunu bir yükleme ekranıyla gizlemek yerine
+# siteyi hiç uyutmuyoruz: her 10 dakikada bir köke hafif bir GET isteği
+# atıyoruz. Bu istek site geneli oturum korumasından (Aşama 17) geçmeden
+# önce yakalanır ama farketmez — girişsiz bir GET, Render'ın "aktivite"
+# saydığı bir HTTP isteğidir, 200/401 dönmesi önemli değil, isteğin
+# gerçekten ulaşmış olması yeterli.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {} # elle test tetiklemek için
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Siteye hafif bir GET isteği at
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          curl --silent --show-error --max-time 30 --retry 1 --retry-delay 5 \
+            -o /dev/null -w "GET %{url_effective} -> %{http_code}\n" \
+            "$APP_URL/"

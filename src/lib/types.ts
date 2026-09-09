@@ -7,7 +7,8 @@ export type Screen =
   | 'projects'
   | 'calendar'
   | 'poems'
-  | 'topics';
+  | 'topics'
+  | 'discover';
 
 export const VALID_SCREENS: Screen[] = [
   'home',
@@ -19,6 +20,7 @@ export const VALID_SCREENS: Screen[] = [
   'calendar',
   'poems',
   'topics',
+  'discover',
 ];
 
 export interface ExtraLink {

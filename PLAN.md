@@ -246,6 +246,52 @@ Zeynep telefonda test ederken 3 görsel hata buldu — hepsi gerçek mobil viewp
   - **Bulunan ek sorun (ekran görüntüsüyle yakalandı):** Sabit konumlu sidebar-açma düğmesi (üst-sol köşe), dar/telefon genişliklerinde dolgu küçüldükçe sayfanın İLK satırıyla (Ana Sayfa'da tarih başlığı "8 Eylül 2026 · Salı", diğer ekranlarda "← Geri") yatay olarak çakışıp metni kesiyordu. Kalıcı çözüm: tek tek her bileşeni yamalamak yerine, dar genişliklerde `main`'in üst dolgusu düğmenin altını (y:54) temizleyecek kadar artırıldı (`App.tsx`) — düğme artık içeriğin ÜSTÜNDEKİ boş alanda duruyor, hangi ekran olursa olsun.
 - Gerçek mobil viewport emülasyonuyla (iPhone 12, 375/390/414/430px) uçtan uca doğrulandı: hiçbir ekranda yatay taşma yok, sidebar drawer açılış/kapanış/otomatik-kapanma çalışıyor, masaüstü davranışı (sidebar sabit sütun, açık varsayılan) etkilenmedi, ekran görüntüleriyle görsel olarak da teyit edildi.
 
+## Aşama 19 — Kullanıcı Deneyimi Düzeltmeleri ✅
+
+### 1. Linkler — "Detayları gör" boştu ✅
+- [x] "Detayları gör" artık `app.closeLinkMenu`'yu çağırıp hiçbir şey yapmıyordu — düzeltildi. Menü artık `linkDetailOpen` durumuna geçip kartın tüm alanlarını (kategori, tarih, not, etiketler, URL) gösteren bir detay görünümü açıyor; "Kapat" ayrı bir buton olarak eklendi (`LinkMenu.tsx`, `AppState.tsx` → `LinkMenuData`).
+
+### 2. Keşfedilen Programlar — ayrı sayfa + carousel + gerçek açıklama ✅
+- [x] Sol menüye ayrı bir "Keşfedilen Programlar" sayfası eklendi (`Discover.tsx`, `discover` ekranı) — sonuçlar mevcut tarama kategorilerine (hackathon/TÜBİTAK/Teknofest/staj) göre gruplanıp gösteriliyor.
+- [x] Son başvuru/geçerlilik tarihi geçmiş sonuçlar otomatik elenir — bu filtre `GET /api/discover/relevant` uç noktasında sunucu tarafında uygulanıyor (aynı `daysLeftReal()` mantığı, gerçek bugünün tarihine göre), yani hem sayfa hem Ana Sayfa widget'ı her zaman güncel; ayrı bir temizleme cron'u gerekmiyor.
+- [x] Ana Sayfa widget'ı artık dörderli gruplar halinde, ‹/› oklarıyla gezilebilen bir carousel (`DiscoveredProgramsWidget`, `Home.tsx`) — kategoriye göre değil, tarihe göre sıralı (bilinen son başvuru tarihi olanlar önce, en yakın en üstte; tarihsiz olanlar en sona). Net bir başlığı var: **"Senin İçin Bulduklarımız"** (dedicated sayfanın başlığı — "Keşfedilen Programlar" — ile bilerek farklı, ikisi ayrı yerler).
+- [x] Açıklama metni artık ham/kesilmiş URL değil — Ollama'nın ürettiği gerçek, doğal bir cümle. **Teknik detay:** SerpApi'nin snippet'i incelendi (375 gerçek kayıt üzerinde) ve pratikte URL-kesiği sorunu neredeyse yoktu (%0 boş, ~%1 URL-ish), ama Zeynep'in gözlemi doğru bir riski işaret ediyordu — bazı snippet'ler yarım cümle/ellipsis'li. Çözüm: zaten her sonuç için bir Ollama çağrısı yapılıyorken (profil filtresi), AYNI çağrıdan bir açıklama da üretiliyor (bkz. madde altında "Ollama analiz birleştirmesi") — ekstra çağrı maliyeti yok.
+
+### 3. Keşfedilen programlardan takip etme ✅
+- [x] Her sonucun yanına "+ Takip et" eklendi (`Discover.tsx` ve Ana Sayfa widget'ında) — tıklanınca `app.followDiscoveredProgram(program)` çağrılıyor: program, Program Takvimi'ne (`extraPrograms`) gerçek bir kayıt olarak ekleniyor (`title`, `date` ← Ollama'nın çıkardığı son başvuru tarihi (yoksa bugün), `note` ← Ollama'nın açıklaması, `link`), kullanıcı elle hiçbir şey girmiyor, sonradan Program Takvimi ekranından düzenlenebilir. Takip edilen sonuç Program Keşfi listesinden de kalkıyor (aynı `dismissProgram` çağrısıyla) — iki yerde tekrar etmesin.
+
+### Ollama analiz birleştirmesi (madde 2 + 3'ün ortak temeli)
+`classifyProgramRelevance()` → `analyzeDiscoveredProgram()` oldu (`src/lib/ollama.ts`) — AYNI tek çağrıda üç şey birden çıkarılıyor: profil alakası (EVET/HAYIR), son başvuru tarihi (GG.AA.YYYY veya YOK), kısa açıklama (1 cümle). Format, gerçek Ollama ile 4 test senaryosunda (TÜBİTAK, maden mühendisliği, Baykar/İHA, Teknofest) iteratif olarak doğrulanıp sağlamlaştırıldı — ilk deneme model satırlara "1. satır:" gibi etiketler ekliyordu ve tarihi ay adıyla ("18 Kasım") yazıyordu, prompt'a somut bir örnek yanıt eklenince (few-shot) ikisi de düzeldi. Sonuç: `discover:items` kayıtlarına artık `deadline`/`description` alanları da yazılıyor (`server.js` → `/api/discover/mark-filtered`); Telegram bildirimi de artık ham snippet yerine bu açıklamayı kullanıyor.
+
+### 4. Render uyku ekranı — keep-alive ile tamamen kaldırıldı ✅
+- [x] Yeni `.github/workflows/keep-alive.yml` — her 10 dakikada bir (`*/10 * * * *`) siteye hafif bir GET isteği atıyor, Render hiç uykuya girmiyor, markalı "cold start" ekranı hiç görünmüyor. `APP_URL` dışında yeni bir secret gerekmiyor (mevcut secret'ı yeniden kullanıyor); auth middleware'inden geçmesi/401 alması sorun değil, Render'ın "aktivite" sayması için isteğin ulaşması yeterli.
+
+### 5. Program Keşfi sıklığı — durum raporu ✅
+- [x] **Zaten haftalık** (`discover-programs.yml` → `cron: '0 6 * * 1'`, her Pazartesi 09:00 TR saati) — herhangi bir değişiklik GEREKMEDİ. Hesap: 28 anahtar kelime × ~4,33 hafta/ay ≈ 121 sorgu/ay, SerpApi'nin 250/ay ücretsiz kotasının sadece ~%48'i — güvenli bir marj var, round-robin/kelime azaltma gerekmiyor. Gerçek durum (kontrol tarihinde): bu ay 56/250 sorgu kullanılmış, 194 kalmış, kota 2026-10-07'de yenileniyor.
+
+### 6. README'deki "merkezi veritabanı değil" açıklaması ✅
+- [x] README'ye "hangi veri nerede duruyor" tablosu eklendi: kişisel içerik (notlar/günlük/linkler/vb.) → `localStorage` (tarayıcıya özel); Program Keşfi sonuçları → Upstash Redis (tarayıcı kapalıyken de yazılabilmeli); fotoğraflar → Cloudinary (localStorage'a sığmayacak kadar büyükler). Pratik sonucu da açıkça yazıldı: farklı bir cihaz/tarayıcıdan girilince kişisel içerik karşı tarafta görünmez.
+
+### 7. Çıkış Yap butonu ✅
+- [x] `POST /api/logout` eklendi (`server.js`) — oturum çerezini temizler. Profil dropdown'ına "Çıkış yap" eklendi (`Sidebar.tsx`) — tıklanınca bu uç noktayı çağırıp sayfayı yeniden yüklüyor, çerez gidince giriş ekranı geliyor.
+
+### 8. Profil fotoğrafı ✅
+- [x] `PersistedState.profilePhoto` eklendi. Profil düzenleme formuna "+ fotoğraf ekle" eklendi (`Sidebar.tsx`) — Home.tsx'teki fotoğraf akışıyla AYNI mekanizma (`compressImage` → `uploadImage` → Cloudinary). Avatar artık fotoğraf varsa onu, yoksa baş harfleri gösteriyor.
+
+### 9. Rastgele değişen arka plan fotoğrafları ✅
+- [x] Zeynep'in `resim/` klasörüne koyduğu 12 fotoğraf `public/backgrounds/`'a (temiz dosya adlarıyla) kopyalandı — kaynak `resim/` klasörü olduğu gibi bırakıldı ama commit'e girmiyor (`.gitignore`), sadece kopyalar (`public/backgrounds/`) versiyon kontrolünde.
+- [x] Yeni `BackgroundAccent` bileşeni (`src/components/BackgroundAccent.tsx`) — Sidebar'ın nav listesiyle profil kartı arasındaki boş alanda, %18 opaklıkta, küçük (130px) bir dairesel görsel. Sayfa her açıldığında rastgele seçiliyor, 75 saniyede bir yumuşak bir geçişle değişiyor. **Teknik not:** Bunu doğru "arkada" göstermek göründüğünden zor çıktı — sayfanın KÖK seviyesinde `position:fixed` + negatif z-index denendiğinde `body`'nin kendi opak arkaplanının ardında tamamen KAYBOLUYORDU (CSS'in katmanlama sırası: negatif z-index'li konumlanmış öğeler, konumlanmamış (static) kardeşlerin arkaplanından ÖNCE/altta boyanır). Çözüm: görseli Sidebar'ın (`position: sticky`/`fixed`, kendi yığın bağlamını oluşturan) bir ÇOCUĞU olarak, `position: absolute` + negatif z-index ile yerleştirmek — bu durumda negatif z-index sadece Sidebar'ın KENDİ alt ağacı içinde geçerli oluyor, aside'ın arkaplanının önünde ama nav metinlerinin arkasında doğru şekilde duruyor.
+- [x] İleride otomatik/AI üretilen görsellere geçiş ayrı bir gelecek aşaması olarak not edildi (bkz. "Gelecek fikirleri" bölümü, en altta).
+
+### Uçtan uca doğrulama (gerçek kimlik bilgileriyle)
+Gerçek tarayıcı testiyle doğrulandı: Linkler detay görünümü, Discover sayfası (kategori grupları + Takip et + gizle), Ana Sayfa carousel'i (sayfalama göstergesi), Çıkış Yap (oturum çerezi gerçekten temizleniyor, giriş ekranına dönülüyor), profil fotoğrafı yükleme (gerçek Cloudinary URL'i, avatar'da render ediliyor), arka plan görseli (sidebar içinde, düşük opaklık). `analyzeDiscoveredProgram()`'ın ürettiği `deadline`/`description` alanlarının `mark-filtered`'a doğru gittiği ve `relevant` uç noktasında süresi geçmiş bir test kaydının doğru şekilde elendiği ayrıca doğrulandı.
+
+**Test sırasında oluşan yan etkiler (bilgi amaçlı):** Uçtan uca test bir gerçek (fakat sahte içerikli, "TÜBİTAK 2209-A Test Programı" başlıklı) Telegram bildirimine ve Cloudinary'ye küçük bir test görseli yüklenmesine yol açtı — ikisi de zararsız, ilki dışında hiçbir gerçek üretim verisi etkilenmedi (kontrol edildi: Program Keşfi'ndeki gerçek/mevcut sonuçlarda beklenmeyen bir "gizli" işareti yok).
+
+## Gelecek fikirleri (henüz plana alınmadı, sadece not)
+- Arka plan görselleri için otomatik/AI üretilen görsellere geçiş (şu an Zeynep'in kendi seçtiği sabit bir set kullanılıyor, bkz. Aşama 19 madde 9).
+- Anahtar kelimelerin kullanıcı içeriğinden otomatik çıkarılması (bkz. Aşama 11).
+
 ---
 **Not:** Her aşama bitince Zeynep'e kısa bir özet ver (ne yapıldı, hangi dosyalar değişti), sıradaki aşamaya geçmeden önce onay bekle.
 

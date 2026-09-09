@@ -113,13 +113,35 @@ const PROFILE_DESCRIPTION =
   'Mekatronik Mühendisliği öğrencisi, Marmara Üniversitesi. İlgi alanları: ' +
   'gömülü sistemler, kontrol sistemleri, OpenCV, TensorFlow Lite, Linux, İHA/drone.';
 
-export async function classifyProgramRelevance(title: string, snippet: string): Promise<boolean | null> {
+export interface ProgramAnalysis {
+  relevant: boolean;
+  // DD.MM.YYYY veya null (metinde açık bir son başvuru/tarih bulunamadıysa)
+  deadline: string | null;
+  // Ollama'nın ürettiği kısa (1 cümle) açıklama — SerpApi'nin ham snippet'i
+  // bazen boş/URL parçası/yarım cümle olabildiği için (bkz. PLAN.md Aşama
+  // 19 madde 2), zaten her sonuç için bir Ollama çağrısı yapılıyorken aynı
+  // yanıttan üretilen bu açıklama gösterimde kullanılıyor.
+  description: string | null;
+}
+
+// Aynı Ollama çağrısında üç şeyi birden çıkarıyoruz (profil alakası +
+// son başvuru tarihi + kısa açıklama) — üç ayrı istek atmak yerine tek
+// istek, hem daha hızlı hem de gecikmeli kuyruğun (Aşama 12/17) toplam
+// süresini üçe katlamıyor.
+export async function analyzeDiscoveredProgram(title: string, snippet: string): Promise<ProgramAnalysis | null> {
   const system =
-    `Sen bir öğrencinin profiline göre iş/program ilanlarının alakalı olup olmadığını ` +
-    `değerlendiren bir asistansın. Profil: ${PROFILE_DESCRIPTION} Katı kurallar: ` +
-    '(1) SADECE "EVET" veya "HAYIR" yaz, başka hiçbir şey yazma. ' +
-    '(2) Genel mühendislik/TÜBİTAK/Teknofest/hackathon programları EVET sayılır. ' +
-    '(3) Maden, inşaat, kimya, tekstil gibi tamamen alakasız mühendislik dalları HAYIR sayılır.';
+    `Sen bir öğrencinin profiline göre bulunan program/ilan sonuçlarını değerlendiren bir ` +
+    `asistansın. Profil: ${PROFILE_DESCRIPTION}\n\n` +
+    'Yanıtın TAM OLARAK 3 satır olacak. HİÇBİR satıra numara, etiket veya "satır" kelimesi ' +
+    'ekleme — sadece istenen değerin kendisini yaz.\n\n' +
+    'Örnek yanıt formatı (bunu kelimesi kelimesine kopyalama, sadece formatı örnek al):\n' +
+    'EVET\n18.11.2025\nÜniversite öğrencilerine yönelik bir araştırma projesi destek programı.\n\n' +
+    'Kurallar:\n' +
+    '- 1. değer: SADECE "EVET" veya "HAYIR". Genel mühendislik/TÜBİTAK/Teknofest/hackathon ' +
+    'programları EVET; maden, inşaat, kimya, tekstil gibi tamamen alakasız dallar HAYIR.\n' +
+    '- 2. değer: Metinde açık bir son başvuru/son tarih varsa GG.AA.YYYY formatında SAYILARLA ' +
+    'yaz (ay adı değil, sayı — örn. Kasım değil 11). Tarih yoksa SADECE "YOK" yaz.\n' +
+    '- 3. değer: Bu program/ilanın ne olduğunu özetleyen TEK bir doğal Türkçe cümle.';
   const prompt = `Başlık: ${title}\nAçıklama: ${snippet}`;
 
   try {
@@ -131,10 +153,24 @@ export async function classifyProgramRelevance(title: string, snippet: string): 
     });
     if (!res.ok) return null;
     const data = await res.json();
-    const raw = typeof data.response === 'string' ? data.response.trim().toUpperCase() : '';
-    if (raw.startsWith('EVET')) return true;
-    if (raw.startsWith('HAYIR')) return false;
-    return null;
+    const raw = typeof data.response === 'string' ? data.response.trim() : '';
+    if (!raw) return null;
+    const lines = raw.split('\n').map((l: string) => l.trim()).filter(Boolean);
+    if (lines.length < 3) return null;
+
+    const relevanceLine = lines[0].toUpperCase();
+    let relevant: boolean;
+    if (relevanceLine.startsWith('EVET')) relevant = true;
+    else if (relevanceLine.startsWith('HAYIR')) relevant = false;
+    else return null;
+
+    const deadlineLine = lines[1];
+    const dateMatch = deadlineLine.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+    const deadline = dateMatch ? `${dateMatch[1].padStart(2, '0')}.${dateMatch[2].padStart(2, '0')}.${dateMatch[3]}` : null;
+
+    const description = firstSentenceOnly(stripQuotes(lines.slice(2).join(' '))) || null;
+
+    return { relevant, deadline, description };
   } catch {
     return null;
   }

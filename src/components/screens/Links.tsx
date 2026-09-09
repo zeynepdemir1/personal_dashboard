@@ -25,7 +25,16 @@ export function Links() {
     url: l.url || '',
     note: l.note || '',
     tags: l.tags || [],
-    open: () => app.openLinkMenu(l.title, l.url || ''),
+    open: () =>
+      app.openLinkMenu({
+        title: l.title,
+        url: l.url || '',
+        kind: l.kind || 'Link',
+        kindColor: l.kindColor || colors.inkSoft,
+        date: l.date || TODAY,
+        note: l.note || '',
+        tags: l.tags || [],
+      }),
   }));
 
   const inputStyle: CSSProperties = {

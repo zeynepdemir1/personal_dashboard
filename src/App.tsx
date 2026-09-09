@@ -11,6 +11,7 @@ import { Projects } from './components/screens/Projects';
 import { CalendarScreen } from './components/screens/CalendarScreen';
 import { Poems } from './components/screens/Poems';
 import { Topics } from './components/screens/Topics';
+import { Discover } from './components/screens/Discover';
 import { colors, fonts, MOBILE_BREAKPOINT } from './lib/theme';
 
 const MODULE_LABELS: Record<string, string> = {
@@ -22,6 +23,7 @@ const MODULE_LABELS: Record<string, string> = {
   poems: 'Şiir',
   topics: 'Araştırılacak Konular',
   diary: 'Günlük',
+  discover: 'Keşfedilen Programlar',
 };
 
 function Shell() {
@@ -133,6 +135,7 @@ function Shell() {
         {app.screen === 'calendar' && <CalendarScreen />}
         {app.screen === 'poems' && <Poems />}
         {app.screen === 'topics' && <Topics />}
+        {app.screen === 'discover' && <Discover />}
       </main>
 
       <DayPanel />

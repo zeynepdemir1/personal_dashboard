@@ -284,6 +284,15 @@ app.post('/api/login', express.json(), (req, res) => {
   res.json({ ok: true });
 });
 
+// Çıkış yap (bkz. PLAN.md Aşama 19 madde 7) — oturum çerezi 30 gün
+// süresizce hatırlanıyordu, manuel bir çıkış yolu yoktu. Bu uç nokta
+// zaten oturum çerezi olan bir istekten çağrılır (auth middleware'i
+// normal şekilde geçer), çerezi temizler.
+app.post('/api/logout', (_req, res) => {
+  res.clearCookie(SESSION_COOKIE, { path: '/' });
+  res.json({ ok: true });
+});
+
 if (GCAL_ICS_URL) {
   app.get('/api/calendar.ics', async (_req, res) => {
     try {
@@ -569,6 +578,9 @@ app.post('/api/discover/scan', express.json(), async (req, res) => {
           category,
           foundAt: new Date().toISOString(),
           status: 'unfiltered',
+          deadline: null,
+          description: null,
+          dismissed: false,
         }));
         newItems += 1;
       } catch (err) {
@@ -601,8 +613,13 @@ app.get('/api/discover/relevant', async (_req, res) => {
   }
   try {
     const items = await redisHGetAll('discover:items');
+    // Son başvuru tarihi geçmiş sonuçlar burada elenir (bkz. PLAN.md
+    // Aşama 19 madde 2) — böylece sayfa/widget her zaman güncel kalır,
+    // ayrı bir temizleme işi/cron'a gerek yok. Tarihi bilinmeyen (deadline
+    // null) sonuçlar süresiz gösterilmeye devam eder.
     const relevant = items
       .filter((it) => it.status === 'relevant' && !it.dismissed)
+      .filter((it) => !it.deadline || daysLeftReal(it.deadline) >= 0)
       .sort((a, b) => (a.foundAt < b.foundAt ? 1 : -1));
     res.json({ items: relevant });
   } catch (err) {
@@ -614,7 +631,7 @@ app.get('/api/discover/relevant', async (_req, res) => {
 const TELEGRAM_MAX_CHARS = 3500; // Telegram'ın 4096 sınırının altında güvenli bir pay
 
 function buildDiscoveryMessages(items) {
-  const itemTexts = items.map((it) => `• ${it.title}\n  ${it.snippet}\n  ${it.link}`);
+  const itemTexts = items.map((it) => `• ${it.title}\n  ${it.description || it.snippet}\n  ${it.link}`);
   const chunks = [];
   let current = [];
   let currentLen = 0;
@@ -650,7 +667,7 @@ app.post('/api/discover/mark-filtered', express.json({ limit: '1mb' }), async (r
   }
   try {
     const toNotify = [];
-    for (const { id, relevant } of results) {
+    for (const { id, relevant, deadline, description } of results) {
       if (typeof id !== 'string') continue;
       const raw = await redis('HGET', 'discover:items', id);
       if (!raw) continue;
@@ -658,6 +675,8 @@ app.post('/api/discover/mark-filtered', express.json({ limit: '1mb' }), async (r
       if (item.status !== 'unfiltered') continue; // zaten işlenmiş, tekrar bildirim gitmesin
       item.status = relevant ? 'relevant' : 'rejected';
       item.filteredAt = new Date().toISOString();
+      item.deadline = typeof deadline === 'string' ? deadline : null;
+      item.description = typeof description === 'string' ? description : null;
       await redis('HSET', 'discover:items', id, JSON.stringify(item));
       if (relevant) toNotify.push(item);
     }

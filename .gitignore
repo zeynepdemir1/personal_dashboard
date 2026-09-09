@@ -17,6 +17,12 @@ dist-ssr
 .env.local
 .env.*.local
 
+# Arka plan görselleri için kaynak/staging klasörü — kullanılan asıl
+# dosyalar public/backgrounds/'a kopyalanıp commit'e giriyor (bkz. PLAN.md
+# Aşama 19 madde 9), bu klasörün kendisi (orijinal Pinterest dosya adları)
+# gereksiz ikilenmesin diye commit'e girmiyor.
+resim
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

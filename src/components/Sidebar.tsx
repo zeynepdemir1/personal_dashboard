@@ -1,8 +1,11 @@
-import type { CSSProperties } from 'react';
+import { useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useApp } from '../state/AppState';
 import { colors, fonts, navItemStyle, MOBILE_BREAKPOINT } from '../lib/theme';
 import { useOllamaStatus } from '../lib/ollama';
 import { initials } from '../lib/profile';
+import { compressImage } from '../lib/image';
+import { uploadImage } from '../lib/upload';
+import { BackgroundAccent } from './BackgroundAccent';
 import type { Screen } from '../lib/types';
 
 const ACADEMIC: { key: Screen; label: string }[] = [
@@ -12,6 +15,7 @@ const ACADEMIC: { key: Screen; label: string }[] = [
   { key: 'projects', label: 'Yapılacak Projeler' },
   { key: 'calendar', label: 'Program Takvimi' },
   { key: 'topics', label: 'Araştırılacak Konular' },
+  { key: 'discover', label: 'Keşfedilen Programlar' },
 ];
 
 const PERSONAL: { key: Screen; label: string }[] = [
@@ -32,6 +36,7 @@ export function Sidebar() {
     projects: String(12 + app.extraProjects.length),
     calendar: String(7 + app.extraPrograms.length),
     topics: String(23 + app.extraTopics.length),
+    discover: String(app.discoveredPrograms.length),
     diary: '·',
     poems: String(app.poemEntries.length),
   };
@@ -47,6 +52,33 @@ export function Sidebar() {
   const goTo = (screen: Screen) => {
     app.navigate(screen);
     if (mobile) app.toggleSidebar();
+  };
+
+  const photoFileRef = useRef<HTMLInputElement>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const handleProfilePhoto = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setPhotoError(null);
+    try {
+      const url = await uploadImage(await compressImage(file));
+      app.setProfilePhoto(url);
+    } catch {
+      setPhotoError('Fotoğraf yüklenemedi, tekrar dene.');
+    }
+  };
+
+  // Oturum çerezi HttpOnly olduğu için istemci JS'i onu doğrudan silemez
+  // — sunucudaki /api/logout'u çağırıp temizletiyoruz, sonra sayfayı
+  // yeniden yüklüyoruz (çerez gidince auth middleware'i giriş ekranını
+  // gösterecek). Bkz. PLAN.md Aşama 19 madde 7.
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+    } finally {
+      window.location.reload();
+    }
   };
 
   const mobileWidth = Math.min(Math.round(app.width * 0.8), 280);
@@ -170,6 +202,8 @@ export function Sidebar() {
         ))}
       </nav>
 
+      {app.sidebarOpen && <BackgroundAccent />}
+
       <div
         style={{
           marginTop: 'auto',
@@ -206,9 +240,14 @@ export function Sidebar() {
               fontFamily: fonts.serif,
               fontSize: 15,
               flex: '0 0 38px',
+              overflow: 'hidden',
             }}
           >
-            {initials(app.profileName)}
+            {app.profilePhoto ? (
+              <img src={app.profilePhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              initials(app.profileName)
+            )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
             <div style={{ fontFamily: fonts.serif, fontSize: 15.5, lineHeight: 1.2 }}>{app.profileName}</div>
@@ -252,6 +291,9 @@ export function Sidebar() {
             <span onClick={app.startEditProfile} className="text-hover-rose" style={{ cursor: 'pointer' }}>
               Profili düzenle
             </span>
+            <span onClick={handleLogout} className="text-hover-red" style={{ cursor: 'pointer' }}>
+              Çıkış yap
+            </span>
           </div>
         )}
 
@@ -279,6 +321,15 @@ export function Sidebar() {
                 borderRadius: 3,
               }}
             />
+            <input ref={photoFileRef} type="file" accept="image/*" hidden onChange={handleProfilePhoto} />
+            <span
+              onClick={() => photoFileRef.current?.click()}
+              className="text-hover-rose"
+              style={{ fontSize: 11.5, color: colors.rose, cursor: 'pointer' }}
+            >
+              {app.profilePhoto ? 'fotoğrafı değiştir' : '+ fotoğraf ekle'}
+            </span>
+            {photoError && <span style={{ fontSize: 11, color: '#B0554F' }}>{photoError}</span>}
             <div style={{ display: 'flex', gap: 6 }}>
               <div
                 onClick={app.cancelEditProfile}
