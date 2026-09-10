@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useApp } from '../state/AppState';
 import { randomBackground } from '../lib/backgrounds';
 import { compressImage } from '../lib/image';
@@ -88,7 +88,7 @@ export function BackgroundAccent() {
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <Fragment>
       <img
         src={src}
         alt=""
@@ -151,6 +151,6 @@ export function BackgroundAccent() {
       )}
 
       <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} style={{ display: 'none' }} />
-    </div>
+    </Fragment>
   );
 }
