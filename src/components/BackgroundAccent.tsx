@@ -121,7 +121,7 @@ export function BackgroundAccent() {
           gap: 10,
           fontFamily: fonts.sans,
           fontSize: 10.5,
-          padding: '4px 0 2px',
+          padding: '4px 0 6px',
         }}
       >
         <span
