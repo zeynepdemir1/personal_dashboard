@@ -115,6 +115,7 @@ function Shell() {
           // durur, hangi ekran/bileşen olursa olsun (tek tek yama gerekmez).
           padding: mobile ? '70px 18px 72px' : tight ? '70px 26px 80px' : '56px 56px 96px',
           maxWidth: 1240,
+          margin: '0 auto',
         }}
       >
         {app.screen !== 'home' && (
