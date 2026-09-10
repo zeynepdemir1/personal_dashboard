@@ -330,8 +330,21 @@ Zeynep'in ek sorusu: günlük şifrelemesi bir "salt" kullanıyorsa ve bu salt s
 ### README.md güncellemesi ✅
 - [x] "Hangi veri nerede duruyor" tablosu güncellendi: kişisel içerik artık `localStorage` değil, Upstash Redis (`app:state` anahtarı). "Kullanıcının kişisel verisi merkezi bir veritabanında değil" sınırlaması kaldırıldı (artık merkezi). Yeni sınırlama olarak "son yazan kazanır" eşzamanlı düzenleme davranışı eklendi.
 
+## Aşama 21 — Arka Plan Fotoğrafları: Sitenden Doğrudan Yükle/Sil ✅
+
+**Sorun:** Arka plan fotoğrafları (Aşama 19 madde 9) sabit bir kod listesiydi (`BACKGROUND_IMAGES`, `src/lib/backgrounds.ts`) — yeni bir fotoğraf eklemek için: `resim/` klasörüne koy → `public/backgrounds/`'a manuel kopyala+yeniden adlandır → listeye elle satır ekle → commit + push. Zeynep bunun otomatikleşmesini istedi; iki seçenek sunuldu (1: sadece klasör taramasını otomatikleştir, commit/push hâlâ gerekli; 2: tam self-servis, siteden yükle). **Zeynep 2'yi seçti.**
+
+- [x] `PersistedState`'e `backgroundImages: string[]` eklendi (`AppState.tsx`) — Aşama 20'nin genel `/api/state` mekanizmasının bir parçası olarak otomatik olarak Redis'e gidiyor, ayrı bir uç nokta/anahtar GEREKMEDİ. Varsayılan değer eski sabit listenin (`BACKGROUND_IMAGES`) kendisi — mevcut kullanıcılar (Zeynep) için hiçbir şey kaybolmadı, ilk açılışta otomatik bu 12 fotoğrafla başlıyor.
+- [x] `BackgroundAccent.tsx`'e iki küçük metin kontrolü eklendi (görselin ALTINDA, normal akışta — görselin kendisi negatif z-index'te olduğu için, bkz. Aşama 19 teknik notu, üstüne tıklanabilir kontrol koymak mümkün değildi): **"+ fotoğraf ekle"** (dosya seç → `compressImage` → `uploadImage` → Cloudinary → dönen URL `app.addBackgroundImage()` ile listeye ekleniyor, PROFİL fotoğrafıyla AYNI mevcut yükleme altyapısı, yeni bir sunucu kodu gerekmedi) ve **"sil"** (o an ekranda görünen fotoğrafı `app.removeBackgroundImage()` ile listeden çıkarıyor).
+- [x] **Koruma:** son kalan tek fotoğraf silinemiyor (`removeBackgroundImage`, boş listeye düşme engelleniyor) — aksi halde rotasyonda gösterilecek hiçbir şey kalmazdı; kullanıcıya "Son fotoğraf silinemez" mesajı gösteriliyor.
+- [x] Şu an ekranda gösterilen fotoğraf başka bir cihazdan silinirse (Aşama 20'nin canlı senkronizasyonu sayesinde bu da mümkün), bileşen bunu algılayıp otomatik başka bir fotoğrafa geçiyor — kırık görsel kalmıyor.
+- [x] `resim/`/`public/backgrounds/`/kod listesine elle dosya ekleme akışı artık GEREKSİZ hâle geldi (isteğe bağlı hâlâ kullanılabilir, ama gerekmiyor) — yeni fotoğraflar tamamen siteden (telefon dahil) ekleniyor/çıkarılıyor, git commit/push YOK, Claude'a haber vermek YOK.
+
+### Uçtan uca doğrulama
+Gerçek bir dosya yükleyip Redis'teki `/api/state` kaydı doğrudan okunarak doğrulandı: yükleme öncesi 12 fotoğraf → yükleme sonrası 13 (yeni gerçek bir Cloudinary URL'i listede) → "sil" sonrası 12 → art arda silmelerle 1'e kadar düşürüldü → son fotoğrafı silme denemesi doğru şekilde engellendi ("Son fotoğraf silinemez" mesajı gösterildi, liste 1'de kaldı). Test, gerçek `app:state` anahtarına dokunmadan geçici bir test anahtarıyla yapıldı (bkz. Aşama 20'deki aynı test-güvenliği yöntemi).
+
 ## Gelecek fikirleri (henüz plana alınmadı, sadece not)
-- Arka plan görselleri için otomatik/AI üretilen görsellere geçiş (şu an Zeynep'in kendi seçtiği sabit bir set kullanılıyor, bkz. Aşama 19 madde 9).
+- Arka plan görselleri için otomatik/AI üretilen görsellere geçiş — Aşama 21'de bunun yerine sitenden doğrudan yükleme/silme (self-servis) tercih edildi, bu fikir hâlâ ayrı bir olasılık olarak (ör. hiç fotoğraf eklenmediğinde bir "varsayılan AI seti" gibi) not düşülüyor.
 - Anahtar kelimelerin kullanıcı içeriğinden otomatik çıkarılması (bkz. Aşama 11).
 
 ---

@@ -146,11 +146,15 @@ tekrar site parolası sorar.
 - **Barındırma:** **Render** (Web Service/Node) — bkz.
   [Deployment](#deployment).
 - **Yerel AI:** **Ollama** (`llama3.1:8b`) — bkz. aşağıdaki mimari karar.
-- **Görsel dekorasyon:** Sol menüde, boş alanda, sabit bir setten
-  rastgele seçilip zaman zaman değişen düşük opaklıklı bir fotoğraf
-  (`public/backgrounds/`) — sade tasarımı bozmayacak şekilde. Şu an
-  Zeynep'in kendi seçtiği sabit bir set; otomatik/AI üretilen görsellere
-  geçiş PLAN.md'de ayrı bir gelecek aşaması olarak not edildi.
+- **Görsel dekorasyon:** Sol menüde, boş alanda, bir fotoğraf havuzundan
+  rastgele seçilip zaman zaman (veya tıklanınca) değişen bir fotoğraf —
+  sade tasarımı bozmayacak şekilde. Havuz (`PersistedState.backgroundImages`,
+  diğer kişisel içerik gibi Upstash Redis'te, bkz. Aşama 20) sitenin
+  kendisinden **doğrudan yönetiliyor** (bkz. Aşama 21): görselin altındaki
+  "+ fotoğraf ekle"/"sil" ile telefon dahil herhangi bir cihazdan fotoğraf
+  eklenip çıkarılabiliyor (mevcut profil fotoğrafı yükleme akışıyla aynı
+  altyapı — Cloudinary). Kod/dosya değişikliği veya deploy GEREKMİYOR; son
+  kalan tek fotoğraf silinemez (rotasyon boş kalmasın diye).
 
 ### Mimari Karar 1: Yerel AI (Ollama)
 Özetleme ve profil filtresi için bir bulut API'si (OpenAI, Anthropic vb.)

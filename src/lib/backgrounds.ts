@@ -1,8 +1,8 @@
-// PLAN.md Aşama 19 madde 9: Zeynep'in kendi seçtiği (Pinterest) fotoğraflar
-// — `public/backgrounds/`'a taşındı (kaynak dosyalar `resim/` klasöründe
-// duruyordu, dosya adları boşluk/emoji içerdiği için sabit adlarla
-// kopyalandı). İleride otomatik/AI üretilen görsellere geçiş ayrı bir
-// aşama olarak PLAN.md'ye not edildi — şimdilik bu sabit set kullanılıyor.
+// PLAN.md Aşama 19 madde 9 / Aşama 21: Zeynep'in seçtiği fotoğraflar önce
+// sabit bir set olarak `public/backgrounds/`'a kondu; Aşama 21'de siteden
+// doğrudan yükleme/silme eklendiği için bu liste artık sadece İLK
+// (varsayılan) set — gerçek liste `PersistedState.backgroundImages`'ta
+// (bkz. AppState.tsx), Redis'te tutuluyor ve cihazlar arası senkronize.
 export const BACKGROUND_IMAGES = [
   '/backgrounds/bg-1.jpeg',
   '/backgrounds/bg-2.jpeg',
@@ -18,8 +18,9 @@ export const BACKGROUND_IMAGES = [
   '/backgrounds/bg-12.jpeg',
 ];
 
-export function randomBackground(exclude?: string): string {
-  const pool = exclude ? BACKGROUND_IMAGES.filter((b) => b !== exclude) : BACKGROUND_IMAGES;
-  const list = pool.length > 0 ? pool : BACKGROUND_IMAGES;
+export function randomBackground(images: string[], exclude?: string): string {
+  const source = images.length > 0 ? images : BACKGROUND_IMAGES;
+  const pool = exclude ? source.filter((b) => b !== exclude) : source;
+  const list = pool.length > 0 ? pool : source;
   return list[Math.floor(Math.random() * list.length)];
 }

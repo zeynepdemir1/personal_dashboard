@@ -15,6 +15,7 @@ import { analyzeDiscoveredProgram, pingOllama, summarizeLearnEntry } from '../li
 import { dismissProgram, fetchPendingPrograms, fetchRelevantPrograms, markFilteredPrograms, type DiscoveredProgram } from '../lib/discover';
 import { formatMonthDay, referenceToday } from '../lib/dates';
 import { DEFAULT_PROFILE_NAME } from '../lib/profile';
+import { BACKGROUND_IMAGES } from '../lib/backgrounds';
 import { MOBILE_BREAKPOINT } from '../lib/theme';
 import {
   VALID_SCREENS,
@@ -90,6 +91,7 @@ interface PersistedState {
   sidebarOpen: boolean;
   profileName: string;
   profilePhoto: string | null;
+  backgroundImages: string[];
 }
 
 function defaultPersisted(): PersistedState {
@@ -112,6 +114,7 @@ function defaultPersisted(): PersistedState {
     sidebarOpen: true,
     profileName: DEFAULT_PROFILE_NAME,
     profilePhoto: null,
+    backgroundImages: [...BACKGROUND_IMAGES],
   };
 }
 
@@ -178,6 +181,10 @@ function normalizeLoadedState(parsed: unknown, mobile: boolean): PersistedState 
     poemEntries: Array.isArray(p.poemEntries) ? (p.poemEntries as PoemX[]) : base.poemEntries,
     profileName: typeof p.profileName === 'string' && p.profileName.trim() ? p.profileName : base.profileName,
     profilePhoto: typeof p.profilePhoto === 'string' ? p.profilePhoto : null,
+    backgroundImages:
+      Array.isArray(p.backgroundImages) && p.backgroundImages.length > 0
+        ? (p.backgroundImages as unknown[]).filter((x): x is string => typeof x === 'string')
+        : base.backgroundImages,
     // Telefon genişliğinde sidebar artık tam ekran bir overlay (bkz.
     // Sidebar.tsx, PLAN.md Aşama 18) — kaydedilmiş değer ne olursa olsun,
     // telefonda her zaman kapalı başlar (bir "flaş" olmadan, bkz. mount
@@ -222,6 +229,9 @@ export interface AppStateValue {
   profileName: string;
   profilePhoto: string | null;
   setProfilePhoto: (url: string) => void;
+  backgroundImages: string[];
+  addBackgroundImage: (url: string) => void;
+  removeBackgroundImage: (url: string) => void;
   editingProfile: boolean;
   qProfileName: string;
   setQProfileName: (v: string) => void;
@@ -703,6 +713,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       profileName: persisted.profileName,
       profilePhoto: persisted.profilePhoto,
       setProfilePhoto: (url: string) => patch({ profilePhoto: url }),
+      backgroundImages: persisted.backgroundImages,
+      addBackgroundImage: (url: string) =>
+        patch({ backgroundImages: [...persistedRef.current.backgroundImages, url] }),
+      removeBackgroundImage: (url: string) => {
+        const next = persistedRef.current.backgroundImages.filter((u) => u !== url);
+        // En az bir fotoğraf her zaman kalmalı — aksi halde rotasyonda
+        // gösterilecek hiçbir şey kalmaz.
+        if (next.length === 0) return;
+        patch({ backgroundImages: next });
+      },
       editingProfile,
       qProfileName,
       setQProfileName,
