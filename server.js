@@ -61,9 +61,17 @@ if (CLOUDINARY_CONFIGURED) {
 const SERPAPI_KEY = process.env.SERPAPI_KEY;
 const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+// Upstash'in kendisi (Program Keşfi'nden bağımsız) — Aşama 20'deki
+// merkezi durum depolama (/api/state) SADECE bu ikisine ihtiyaç duyuyor,
+// SERPAPI_KEY'e değil. DISCOVER_CONFIGURED (aşağıda) Program Keşfi'ne
+// özel, SerpApi'yi de şart koşuyor.
+const UPSTASH_CONFIGURED = !!(UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN);
 const DISCOVER_CONFIGURED = !!(SERPAPI_KEY && UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN);
 if (!DISCOVER_CONFIGURED) {
   console.warn('[server] SerpApi/Upstash ortam değişkenleri eksik — Program Keşfi devre dışı kalacak.');
+}
+if (!UPSTASH_CONFIGURED) {
+  console.warn('[server] Upstash ortam değişkenleri eksik — merkezi durum depolama (/api/state) devre dışı kalacak.');
 }
 
 // Sabit zamanlı (timing-safe) string karşılaştırma — parola/sır
@@ -352,18 +360,81 @@ app.post('/api/upload-image', express.json({ limit: '8mb' }), async (req, res) =
   }
 });
 
+// Merkezi durum depolama (bkz. PLAN.md Aşama 20) — kişisel içerik
+// (Akademik Gelişim, Bir Şey Öğrendim, Günlük, Linkler, Yapılacak
+// Projeler, Araştırılacak Konular, Şiir, Program Takvimi, profil vb.)
+// artık tarayıcının localStorage'ı yerine burada, Upstash Redis'te TEK
+// bir JSON belge olarak tutuluyor (`app:state` anahtarı) — cihazlar
+// arası senkronizasyon bunu gerektiriyordu, localStorage cihaza özeldi.
+//
+// GÜNLÜK ŞİFRELEMESİ TAMAMEN İSTEMCİDE KALIYOR: bu uç nokta gönderilen/
+// döndürülen JSON'u hiç yorumlamıyor, sadece opak bir blob olarak
+// saklıyor. Günlük metinleri (`diaryEntries[].text`) buraya zaten
+// AES-GCM ile şifrelenmiş (base64) halde geliyor — şifreleme/çözme hiç
+// sunucuya uğramıyor (bkz. AppState.tsx, diaryCrypto.ts, Aşama 17).
+//
+// Basit "son yazan kazanır" (last-write-wins) modeli — eşzamanlı iki
+// cihazdan aynı anda yapılan değişikliklerde biri diğerini ezebilir.
+// Tek kullanıcılı bir araç için kabul edilebilir bir basitleştirme;
+// gerçek bir merge/CRDT mekanizması bu aşamanın kapsamı dışında
+// bırakıldı (bkz. PLAN.md).
+const STATE_KEY = 'app:state';
+const MAX_STATE_BYTES = 10 * 1024 * 1024; // 10 MB — cömert bir üst sınır
+
+app.get('/api/state', async (_req, res) => {
+  if (!UPSTASH_CONFIGURED) {
+    res.status(503).json({ error: 'state storage not configured' });
+    return;
+  }
+  try {
+    const raw = await redis('GET', STATE_KEY);
+    if (!raw) {
+      res.json({ exists: false, state: null });
+      return;
+    }
+    res.json({ exists: true, state: JSON.parse(raw) });
+  } catch (err) {
+    console.error('[server] Durum okunamadı:', err);
+    res.status(502).json({ error: 'read failed' });
+  }
+});
+
+app.put('/api/state', express.json({ limit: '10mb' }), async (req, res) => {
+  if (!UPSTASH_CONFIGURED) {
+    res.status(503).json({ error: 'state storage not configured' });
+    return;
+  }
+  const state = req.body;
+  if (!state || typeof state !== 'object' || Array.isArray(state)) {
+    res.status(400).json({ error: 'invalid state' });
+    return;
+  }
+  const serialized = JSON.stringify(state);
+  if (serialized.length > MAX_STATE_BYTES) {
+    res.status(413).json({ error: 'state too large' });
+    return;
+  }
+  try {
+    await redis('SET', STATE_KEY, serialized);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[server] Durum kaydedilemedi:', err);
+    res.status(502).json({ error: 'write failed' });
+  }
+});
+
 // Günlük Telegram bildirimi (bkz. PLAN.md Aşama 15, madde 5) — GitHub
 // Actions'taki zamanlanmış bir workflow bu uç noktayı her gün tetikler
 // (bkz. .github/workflows/daily-telegram-notify.yml). Paylaşımlı bir sır
 // (CRON_SECRET) ile korunuyor; doğru başlık olmadan istek 401 alır.
 //
-// ÖNEMLİ SINIRLAMA: Uygulamanın TÜM kişisel verisi (eklediğin dersler/
-// notlar, program eklemeleri) yalnızca tarayıcının localStorage'ında
-// yaşıyor — sunucunun buna hiçbir erişimi yok. Bu yüzden bildirim şu an
-// SADECE statik "Yaklaşan Programlar" listesindeki (data.ts → PROGRAMS)
-// gerçek tarihli hatırlatmaları, GERÇEK bugünün tarihine göre raporluyor.
-// Kendi eklediğin ders notların bu bildirime giremiyor — bunun için
-// gerçek bir sunucu tarafı veritabanı gerekir (şimdilik kapsam dışı).
+// NOT (Aşama 20 sonrası güncel): kullanıcının kişisel verisi artık
+// yukarıdaki `/api/state` ile sunucu tarafında (Upstash) da erişilebilir
+// durumda — ileride bu bildirim kullanıcının GERÇEK eklediği program
+// kayıtlarını da (sadece statik listeyi değil) raporlayacak şekilde
+// genişletilebilir. Bu, Aşama 20'nin kapsamı dışında bırakıldı, PLAN.md'ye
+// bir gelecek fikri olarak not edildi — şimdilik hâlâ SADECE statik
+// "Yaklaşan Programlar" listesini (data.ts → PROGRAMS) raporluyor.
 const UPCOMING_PROGRAMS = [
   { date: '15.09.2026', title: 'TÜBİTAK 2209-A · 2. dönem son başvuru', note: 'Proje önerisi, bütçe tablosu, danışman onayı' },
   { date: '02.10.2026', title: 'TEKNOFEST takım başvurusu', note: 'Kontrol ve otomasyon kategorisi' },

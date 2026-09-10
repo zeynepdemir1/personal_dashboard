@@ -271,6 +271,7 @@ Zeynep telefonda test ederken 3 görsel hata buldu — hepsi gerçek mobil viewp
 
 ### 6. README'deki "merkezi veritabanı değil" açıklaması ✅
 - [x] README'ye "hangi veri nerede duruyor" tablosu eklendi: kişisel içerik (notlar/günlük/linkler/vb.) → `localStorage` (tarayıcıya özel); Program Keşfi sonuçları → Upstash Redis (tarayıcı kapalıyken de yazılabilmeli); fotoğraflar → Cloudinary (localStorage'a sığmayacak kadar büyükler). Pratik sonucu da açıkça yazıldı: farklı bir cihaz/tarayıcıdan girilince kişisel içerik karşı tarafta görünmez.
+  - **GÜNCELLEME (Aşama 20):** Bu satır artık geçerli değil — kişisel içerik de Upstash Redis'e taşındı, cihazlar arası senkronizasyon artık ÇALIŞIYOR. Bkz. Aşama 20, README güncellendi.
 
 ### 7. Çıkış Yap butonu ✅
 - [x] `POST /api/logout` eklendi (`server.js`) — oturum çerezini temizler. Profil dropdown'ına "Çıkış yap" eklendi (`Sidebar.tsx`) — tıklanınca bu uç noktayı çağırıp sayfayı yeniden yüklüyor, çerez gidince giriş ekranı geliyor.
@@ -282,11 +283,52 @@ Zeynep telefonda test ederken 3 görsel hata buldu — hepsi gerçek mobil viewp
 - [x] Zeynep'in `resim/` klasörüne koyduğu 12 fotoğraf `public/backgrounds/`'a (temiz dosya adlarıyla) kopyalandı — kaynak `resim/` klasörü olduğu gibi bırakıldı ama commit'e girmiyor (`.gitignore`), sadece kopyalar (`public/backgrounds/`) versiyon kontrolünde.
 - [x] Yeni `BackgroundAccent` bileşeni (`src/components/BackgroundAccent.tsx`) — Sidebar'ın nav listesiyle profil kartı arasındaki boş alanda, %18 opaklıkta, küçük (130px) bir dairesel görsel. Sayfa her açıldığında rastgele seçiliyor, 75 saniyede bir yumuşak bir geçişle değişiyor. **Teknik not:** Bunu doğru "arkada" göstermek göründüğünden zor çıktı — sayfanın KÖK seviyesinde `position:fixed` + negatif z-index denendiğinde `body`'nin kendi opak arkaplanının ardında tamamen KAYBOLUYORDU (CSS'in katmanlama sırası: negatif z-index'li konumlanmış öğeler, konumlanmamış (static) kardeşlerin arkaplanından ÖNCE/altta boyanır). Çözüm: görseli Sidebar'ın (`position: sticky`/`fixed`, kendi yığın bağlamını oluşturan) bir ÇOCUĞU olarak, `position: absolute` + negatif z-index ile yerleştirmek — bu durumda negatif z-index sadece Sidebar'ın KENDİ alt ağacı içinde geçerli oluyor, aside'ın arkaplanının önünde ama nav metinlerinin arkasında doğru şekilde duruyor.
 - [x] İleride otomatik/AI üretilen görsellere geçiş ayrı bir gelecek aşaması olarak not edildi (bkz. "Gelecek fikirleri" bölümü, en altta).
+- [x] **Ek düzeltme (Zeynep'in geri bildirimiyle, iki turda):** İlk sürüm çok silik ve tam daire (border-radius: 50%) duruyordu — dikdörtgene (`borderRadius: 10`) çevrildi, opaklık %18'den %45'e çıkarıldı, ekran görüntüsüyle doğrulanıp gösterildi. İkinci turda Zeynep görseli hâlâ küçük/silik buldu: boyut ~2 katına çıkarıldı (130→168px yükseklik, genişlik en dar sidebar durumuna — 210px tight breakpoint — göre 195px'te sınırlandı, taşma yok), opaklık %45'ten %65'e çıkarıldı; ayrıca görsele tıklanınca da (75 saniyelik otomatik döngüye ek olarak) değişmesi istendi — `onClick` eklendi, `pointerEvents: 'none'` kaldırıldı, `cursor: pointer` + açıklayıcı `title` eklendi. Playwright ile hem boyut/opaklık hem tıklama davranışı doğrulandı.
 
 ### Uçtan uca doğrulama (gerçek kimlik bilgileriyle)
 Gerçek tarayıcı testiyle doğrulandı: Linkler detay görünümü, Discover sayfası (kategori grupları + Takip et + gizle), Ana Sayfa carousel'i (sayfalama göstergesi), Çıkış Yap (oturum çerezi gerçekten temizleniyor, giriş ekranına dönülüyor), profil fotoğrafı yükleme (gerçek Cloudinary URL'i, avatar'da render ediliyor), arka plan görseli (sidebar içinde, düşük opaklık). `analyzeDiscoveredProgram()`'ın ürettiği `deadline`/`description` alanlarının `mark-filtered`'a doğru gittiği ve `relevant` uç noktasında süresi geçmiş bir test kaydının doğru şekilde elendiği ayrıca doğrulandı.
 
 **Test sırasında oluşan yan etkiler (bilgi amaçlı):** Uçtan uca test bir gerçek (fakat sahte içerikli, "TÜBİTAK 2209-A Test Programı" başlıklı) Telegram bildirimine ve Cloudinary'ye küçük bir test görseli yüklenmesine yol açtı — ikisi de zararsız, ilki dışında hiçbir gerçek üretim verisi etkilenmedi (kontrol edildi: Program Keşfi'ndeki gerçek/mevcut sonuçlarda beklenmeyen bir "gizli" işareti yok).
+
+## Aşama 20 — Merkezi Veri Depolama (localStorage'dan Upstash Redis'e geçiş) ✅
+
+**Sorun:** Kişisel içerik (Akademik Gelişim, Bir Şey Öğrendim, Şiir, Günlük, Yapılacak Projeler, Linkler, Araştırılacak Konular, Program Takvimi, profil) tarayıcının `localStorage`'ında tutuluyordu — cihazlar arası senkronizasyon imkansızdı, telefondan eklenen bir şey bilgisayarda görünmüyordu. Bu, projenin "farklı cihazlardan erişilebilir olsun" hedefiyle çelişiyordu.
+
+### 1. Sunucu tarafı: `/api/state` (GET/PUT) ✅
+- [x] `server.js`'e `GET /api/state` ve `PUT /api/state` eklendi — tüm `PersistedState` nesnesi TEK bir Redis anahtarında (`app:state`) opak bir JSON blob olarak saklanıyor (Program Keşfi'yle aynı Upstash veritabanı, farklı anahtar/namespace). Yeni bir `UPSTASH_CONFIGURED` bayrağı eklendi (Program Keşfi'nin `DISCOVER_CONFIGURED`'ından farklı — SerpApi'ye ihtiyaç duymuyor, sadece Upstash'e). Üst sınır: 10 MB (`MAX_STATE_BYTES`).
+- [x] Site geneli oturum auth middleware'i (Aşama 17) `/api/state` uç noktalarını otomatik koruyor — route'lar middleware'den SONRA tanımlandığı için ayrı bir yetkilendirme kodu gerekmedi.
+
+### 2. İstemci tarafı: `AppState.tsx` yeniden yazıldı ✅
+- [x] Eski senkron `loadPersisted()` (localStorage okuma) yerine: mount'ta `/api/state`'den asenkron yükleme, `stateLoading`/`stateError` durumu (`App.tsx`'te bir "Yükleniyor…" ekranı gösteriyor — gerçek veri gelene kadar boş/varsayılan içeriğin bir an görünüp kaybolması ("flaş") önlendi).
+- [x] Kaydetme artık debounce'lı (400ms) bir `PUT /api/state` — `hasLoadedRef` (bir `useRef(false)`) ile korunuyor: ilk yükleme/migration bitmeden kaydetme effect'i TETİKLENMİYOR (yoksa boş varsayılan state, sunucudaki gerçek veriyi sessizce ezebilirdi).
+- [x] **Cihazlar arası canlı senkronizasyon:** sekme odak (`focus`) veya görünürlük (`visibilitychange`) kazandığında `/api/state` yeniden çekiliyor ve yerel state değiştiriliyor — sürekli polling YOK, aktif düzenleme sırasında YOK, sadece kullanıcı sekmeye/uygulamaya geri döndüğünde ("pull to refresh").
+- [x] **Kabul edilen basitleştirme — "son yazan kazanır" (last-write-wins):** iki cihazdan eşzamanlı değişiklik yapılırsa biri diğerini ezebilir. Tek kullanıcılı bir araç için makul; gerçek bir merge/CRDT mekanizması kapsam dışı bırakıldı.
+
+### 3. Migration (tek seferlik, kayıpsız) ✅
+- [x] Uygulama ilk açıldığında: önce `/api/state` sorgulanıyor. Sunucu `exists:false` derse (yani Redis'te henüz kayıt yoksa) VE tarayıcının `localStorage`'ında eski anahtarda (`muhendis-portal-state-v1`) veri varsa, o veri normalize edilip (`normalizeLoadedState()` — hem migration hem normal sunucu-yükleme yolunda ORTAK kullanılan tek fonksiyon) `PUT /api/state` ile Redis'e yazılıyor; yazma BAŞARIYLA onaylandıktan SONRA `localStorage.removeItem(...)` çağrılıyor. Sunucu zaten `exists:true` derse (yani migration daha önce yapılmış), `localStorage`'a hiç dokunulmuyor, tekrar migration denenmiyor.
+- [x] Gerçek bir "eski cihaz" senaryosuyla uçtan uca doğrulandı: sahte-gerçekçi bir eski `localStorage` verisiyle (profil, link, şiir alanları dahil) Cihaz A ilk açılışta migration'ı doğru yaptı (localStorage temizlendi, tüm alanlar Redis'te doğru göründü); tamamen ayrı, BOŞ localStorage'lı bir Cihaz B aynı veriyi SADECE Redis'ten doğru şekilde yükledi.
+
+### 4. KRİTİK GÜVENLİK NOKTASI — Günlük şifrelemesi client-side kaldı ✅
+- [x] `/api/state` gönderilen/dönen JSON'u hiç yorumlamıyor, opak bir blob olarak saklıyor — Günlük modülünün AES-GCM şifrelemesi (Web Crypto API, Aşama 17) hiçbir şekilde değişmedi: şifreleme/çözme hâlâ SADECE tarayıcıda (`AppState.tsx`, `diaryCrypto.ts`) yapılıyor, sunucuya hiç uğramıyor. `persisted.diaryEntries[].text` alanı, `patch()` çağrılmadan ÖNCE zaten şifrelenmiş haldedir — bu, `persisted`'i opak bir blob olarak taşıyan HERHANGİ bir mekanizma (eski localStorage da, yeni Redis de) tarafından otomatik olarak korunuyor, özel bir kod gerekmedi.
+- [x] **Doğrulama (localStorage'a değil, gerçek Redis kaydına bakılarak):** Redis'teki ham `/api/state` yanıtı incelendi — `diaryEntries[].text` alanlarının HİÇBİRİ test metninin düz halini içermiyordu; örnek bir kayıt gerçekten okunamaz bir şifreli metin (`hcl+4ZGr/jrM1t+s+b3PYWGC2u19VzeyXrZEtpePDQPhzdENZd...` gibi) olarak doğrulandı.
+
+### 5. Ek istek — cihazlar arası günlük şifre çözme (salt taşıma) ✅
+Zeynep'in ek sorusu: günlük şifrelemesi bir "salt" kullanıyorsa ve bu salt sadece cihazın localStorage'ında tutuluyorsa, farklı bir cihazdan AYNI parolayla açmak mümkün olmayabilirdi — bu da Redis'e taşınmalıydı.
+- [x] **Tasarım gereği zaten doğru çıktı:** `DiarySecurity` tipi (`{ enabled, salt, canary }`), `diaryEntries` gibi `PersistedState`'in NORMAL bir alanı — bütün nesneyi TEK blob olarak taşıyan migration/senkronizasyon mekanizması, `salt`'ı da otomatik olarak Redis'e taşıyor, özel bir durum gerekmedi.
+- [x] **Gerçek bir testle kanıtlandı** (localStorage'a değil, Redis'e bakılarak): Cihaz A'da bir parola ile bir günlük girişi oluşturuldu → Redis'teki `/api/state` yanıtında `diarySecurity.salt` ve `diarySecurity.canary` mevcuttu → tamamen ayrı, BOŞ localStorage'lı bir Cihaz B (Redis'te `diarySecurity` bulunduğu için normal "kilit açma" ekranını gösterdi, "ilk kurulum" ekranını DEĞİL) AYNI parolayla girişi başarıyla çözüp gösterdi. **Sonuç: cihazdan bağımsız çalışıyor, ek bir düzeltme gerekmedi — sadece doğrulandı.**
+
+### 6. Dokunulmayanlar (istendiği gibi) ✅
+- [x] Fotoğraflar (Cloudinary) ve Program Keşfi sonuçları (`discover:items`/`discover:seen`, zaten Redis'te) bu değişiklikten etkilenmedi — ayrı uç noktalar/anahtarlar, hiç değiştirilmedi.
+
+### Uçtan uca doğrulama (tüm modüller, iki ayrı tarayıcı bağlamı/"cihaz" ile)
+- Migration testi: eski/sahte `localStorage` verisiyle Cihaz A → Redis'e doğru taşındı, temiz Cihaz B aynı veriyi sadece Redis'ten gördü (profil, link, şiir alanları).
+- Günlük + salt cihazlar arası testi: yukarıda madde 5.
+- Program Takvimi, Araştırılacak Konular (Merak konuları), Yapılacak Projeler (Proje fikirleri): Cihaz A'da eklendi → Cihaz B'nin TAZE (sıfırdan) yüklemesinde üçü de görüldü.
+- **Canlı senkronizasyon testi:** Cihaz B açıkken Cihaz A yeni bir kayıt ekledi; Cihaz B'ye bir `focus`/`visibilitychange` olayı tetiklendiğinde (sekmeye geri dönüş simülasyonu) yeni kayıt sayfayı yenilemeden göründü.
+- Test altyapısı notu: yerel test sunucusu ile gerçek (production) site AYNI Upstash kimlik bilgilerini paylaştığı için, testler boyunca `STATE_KEY` geçici olarak `app:state:TESTING-TEMP`'e çevrilip gerçek `app:state` anahtarına hiç dokunulmadı (test öncesi/sonrası `EXISTS` ile doğrulandı); test bitince `STATE_KEY` `app:state`'e geri alındı ve test anahtarı silindi. Yani Zeynep'in gerçek verisi/migration'ı bu testlerden ETKİLENMEDİ — production'a ilk girişinde migration hâlâ ilk kez, beklendiği gibi çalışacak.
+
+### README.md güncellemesi ✅
+- [x] "Hangi veri nerede duruyor" tablosu güncellendi: kişisel içerik artık `localStorage` değil, Upstash Redis (`app:state` anahtarı). "Kullanıcının kişisel verisi merkezi bir veritabanında değil" sınırlaması kaldırıldı (artık merkezi). Yeni sınırlama olarak "son yazan kazanır" eşzamanlı düzenleme davranışı eklendi.
 
 ## Gelecek fikirleri (henüz plana alınmadı, sadece not)
 - Arka plan görselleri için otomatik/AI üretilen görsellere geçiş (şu an Zeynep'in kendi seçtiği sabit bir set kullanılıyor, bkz. Aşama 19 madde 9).

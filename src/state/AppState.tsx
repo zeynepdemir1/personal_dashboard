@@ -155,38 +155,35 @@ function normalizeExtraProjects(raw: unknown): ExtraProject[] {
   });
 }
 
-function loadPersisted(): PersistedState {
+// PLAN.md Aşama 20: kişisel içerik artık localStorage yerine sunucuda
+// (Upstash Redis, `/api/state`) tutuluyor — bu fonksiyon, ister sunucudan
+// gelsin ister eski localStorage'dan (tek seferlik geçiş, bkz. aşağıdaki
+// mount effect'i), HAM/güvenilmez bir JSON nesnesini güvenli bir
+// PersistedState'e çeviriyor. Saf bir fonksiyon — kendi başına localStorage/
+// ağ erişimi yok, sadece elindeki veriyi normalize ediyor.
+function normalizeLoadedState(parsed: unknown, mobile: boolean): PersistedState {
   const base = defaultPersisted();
-  if (typeof window === 'undefined') return base;
-  // Telefon genişliğinde sidebar artık tam ekran bir overlay (bkz.
-  // Sidebar.tsx, PLAN.md Aşama 18) — `sidebarOpen` varsayılanı (true)
-  // masaüstü içindi. Bunu İLK RENDER'DA (bir effect'le SONRADAN düzeltmek
-  // yerine) burada hesaplıyoruz ki telefonda sayfa her açıldığında
-  // sidebar bir an görünüp kapanan bir "flaş" yapmasın — ilk boyama
-  // zaten kapalı gelsin.
-  const mobile = window.innerWidth < MOBILE_BREAKPOINT;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return mobile ? { ...base, sidebarOpen: false } : base;
-    const parsed = JSON.parse(raw);
-    return {
-      ...base,
-      ...parsed,
-      extraPrograms: normalizeExtraPrograms(parsed.extraPrograms),
-      extraProjects: normalizeExtraProjects(parsed.extraProjects),
-      diaryEntries: Array.isArray(parsed.diaryEntries) ? parsed.diaryEntries : base.diaryEntries,
-      diarySecurity:
-        parsed.diarySecurity && typeof parsed.diarySecurity === 'object' && parsed.diarySecurity.enabled
-          ? parsed.diarySecurity
-          : null,
-      poemEntries: Array.isArray(parsed.poemEntries) ? parsed.poemEntries : base.poemEntries,
-      profileName: typeof parsed.profileName === 'string' && parsed.profileName.trim() ? parsed.profileName : base.profileName,
-      profilePhoto: typeof parsed.profilePhoto === 'string' ? parsed.profilePhoto : null,
-      sidebarOpen: mobile ? false : typeof parsed.sidebarOpen === 'boolean' ? parsed.sidebarOpen : base.sidebarOpen,
-    };
-  } catch {
-    return mobile ? { ...base, sidebarOpen: false } : base;
-  }
+  if (!parsed || typeof parsed !== 'object') return mobile ? { ...base, sidebarOpen: false } : base;
+  const p = parsed as Record<string, unknown>;
+  return {
+    ...base,
+    ...p,
+    extraPrograms: normalizeExtraPrograms(p.extraPrograms),
+    extraProjects: normalizeExtraProjects(p.extraProjects),
+    diaryEntries: Array.isArray(p.diaryEntries) ? (p.diaryEntries as DiaryEntryX[]) : base.diaryEntries,
+    diarySecurity:
+      p.diarySecurity && typeof p.diarySecurity === 'object' && (p.diarySecurity as DiarySecurity).enabled
+        ? (p.diarySecurity as DiarySecurity)
+        : null,
+    poemEntries: Array.isArray(p.poemEntries) ? (p.poemEntries as PoemX[]) : base.poemEntries,
+    profileName: typeof p.profileName === 'string' && p.profileName.trim() ? p.profileName : base.profileName,
+    profilePhoto: typeof p.profilePhoto === 'string' ? p.profilePhoto : null,
+    // Telefon genişliğinde sidebar artık tam ekran bir overlay (bkz.
+    // Sidebar.tsx, PLAN.md Aşama 18) — kaydedilmiş değer ne olursa olsun,
+    // telefonda her zaman kapalı başlar (bir "flaş" olmadan, bkz. mount
+    // effect'indeki `stateLoading` kapısı).
+    sidebarOpen: mobile ? false : typeof p.sidebarOpen === 'boolean' ? p.sidebarOpen : base.sidebarOpen,
+  };
 }
 
 // entry === null anlamı "hash'te belirtilmemiş" (ör. sadece "#projects") —
@@ -204,6 +201,13 @@ function parseHash(): { screen: Screen; entry: number | null } {
 }
 
 export interface AppStateValue {
+  // PLAN.md Aşama 20 — kişisel içerik artık sunucudan (Upstash Redis)
+  // asenkron olarak yükleniyor; `stateLoading` true iken `App.tsx` gerçek
+  // arayüz yerine kısa bir yükleme ekranı gösteriyor (varsayılan/boş
+  // içeriğin bir anlığına görünmesini önlemek için).
+  stateLoading: boolean;
+  stateError: string | null;
+
   screen: Screen;
   entry: number | null;
   navigate: (screen: Screen, entry?: number) => void;
@@ -346,31 +350,133 @@ export interface AppStateValue {
 const AppStateContext = createContext<AppStateValue | null>(null);
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
-  const [persisted, setPersisted] = useState<PersistedState>(loadPersisted);
+  const [persisted, setPersisted] = useState<PersistedState>(() => defaultPersisted());
   const persistedRef = useRef(persisted);
   persistedRef.current = persisted;
 
+  // İlk yükleme henüz bitmeden kaydetme effect'i tetiklenirse (varsayılan
+  // boş state), sunucudaki GERÇEK veriyi bir anlığına ezip geri
+  // yazabilirdi — bu bayrak, ilk fetch/geçiş tamamlanana kadar kaydetmeyi
+  // engelliyor.
+  const hasLoadedRef = useRef(false);
+  const [stateLoading, setStateLoading] = useState(true);
+  const [stateError, setStateError] = useState<string | null>(null);
+
+  // PLAN.md Aşama 20 — ilk açılışta sunucudan (Upstash) durumu çek. Sunucuda
+  // henüz veri yoksa (`exists:false`) ve tarayıcıda ESKİ localStorage
+  // verisi varsa, TEK SEFERLİK bir geçiş yapılır: o veri sunucuya
+  // yazılır, başarılı olursa localStorage temizlenir. Sunucuda zaten
+  // veri VARSA localStorage'a hiç bakılmaz/dokunulmaz — bu, olası bir
+  // hatanın gerçek veriyi eski/bayat bir localStorage kopyasıyla
+  // ezmesine karşı bilinçli bir güvenlik önlemi.
   useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
-    } catch (err) {
-      // localStorage kotası dolduysa (büyük bir görsel yüzünden — artık
-      // görseller kaydetmeden önce küçültülüyor ama eski kayıtlarda ham
-      // görseller kalmış olabilir) en azından metin verisini kaybetmemek
-      // için görselleri çıkarıp bir kez daha dene.
-      console.warn('[AppState] localStorage kaydı başarısız, görseller çıkarılıp yeniden denenecek:', err);
+    let cancelled = false;
+    (async () => {
+      const mobile = typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT;
       try {
-        const stripped: PersistedState = {
-          ...persisted,
-          extraTopics: persisted.extraTopics.map((t) => ({ ...t, image: undefined })),
-          extraProjects: persisted.extraProjects.map((p) => ({ ...p, image: undefined })),
-        };
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stripped));
-      } catch (err2) {
-        console.error('[AppState] localStorage kaydı görseller çıkarılınca da başarısız oldu:', err2);
+        const res = await fetch('/api/state');
+        if (!res.ok) throw new Error(`state fetch ${res.status}`);
+        const data = await res.json();
+        if (cancelled) return;
+
+        if (data.exists && data.state) {
+          setPersisted(normalizeLoadedState(data.state, mobile));
+        } else {
+          const legacyRaw = window.localStorage.getItem(STORAGE_KEY);
+          if (legacyRaw) {
+            let migrated: PersistedState;
+            try {
+              migrated = normalizeLoadedState(JSON.parse(legacyRaw), mobile);
+            } catch {
+              migrated = normalizeLoadedState(null, mobile);
+            }
+            setPersisted(migrated);
+            try {
+              const putRes = await fetch('/api/state', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(migrated),
+              });
+              if (putRes.ok) {
+                window.localStorage.removeItem(STORAGE_KEY);
+                console.info('[AppState] Eski localStorage verisi sunucuya (Upstash Redis) taşındı.');
+              } else {
+                console.warn('[AppState] Geçiş yazması başarısız — localStorage korunuyor, bir sonraki açılışta tekrar denenecek.');
+              }
+            } catch (err) {
+              console.warn('[AppState] Geçiş yazması başarısız — localStorage korunuyor, bir sonraki açılışta tekrar denenecek:', err);
+            }
+          } else {
+            setPersisted(normalizeLoadedState(null, mobile));
+          }
+        }
+      } catch (err) {
+        console.error('[AppState] Sunucudan durum okunamadı:', err);
+        if (cancelled) return;
+        setStateError('Verileriniz sunucudan yüklenemedi. Bağlantınızı kontrol edip sayfayı yenileyin.');
+        // Çevrimdışı/erişilemez durumda en azından eski localStorage
+        // kopyası varsa onu göster — hiç veri göstermemekten iyidir.
+        const legacyRaw = window.localStorage.getItem(STORAGE_KEY);
+        if (legacyRaw) {
+          try {
+            setPersisted(normalizeLoadedState(JSON.parse(legacyRaw), mobile));
+          } catch {
+            // yoksay, varsayılanla devam
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          hasLoadedRef.current = true;
+          setStateLoading(false);
+        }
       }
-    }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Kaydetme: her değişiklikte sunucuya PUT — küçük bir debounce ile
+  // (hızlı art arda değişiklikleri tek isteğe topluyor). İlk yükleme
+  // bitmeden ASLA kaydetmiyor (yukarıdaki not).
+  useEffect(() => {
+    if (!hasLoadedRef.current) return;
+    const timeout = setTimeout(() => {
+      fetch('/api/state', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(persisted),
+      })
+        .then((res) => {
+          if (!res.ok) console.error('[AppState] Durum sunucuya kaydedilemedi:', res.status);
+        })
+        .catch((err) => console.error('[AppState] Durum sunucuya kaydedilemedi:', err));
+    }, 400);
+    return () => clearTimeout(timeout);
   }, [persisted]);
+
+  // Başka bir cihaz/sekmeden yapılan değişiklikleri yakalamak için: bu
+  // sekmeye geri dönülünce (odak/görünürlük değişince) sunucudan tazele.
+  // Aktif düzenleme sırasında DEĞİL, sadece sekmeye dönüşte — basit ama
+  // "telefonda ekledim, bilgisayarda görünüyor mu" senaryosu için yeterli.
+  useEffect(() => {
+    const refresh = () => {
+      if (!hasLoadedRef.current || document.hidden) return;
+      const mobile = window.innerWidth < MOBILE_BREAKPOINT;
+      fetch('/api/state')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.exists && data.state) setPersisted(normalizeLoadedState(data.state, mobile));
+        })
+        .catch(() => {});
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, []);
 
   const patch = (p: Partial<PersistedState>) => setPersisted((s) => ({ ...s, ...p }));
 
@@ -580,6 +686,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const value: AppStateValue = useMemo(
     () => ({
+      stateLoading,
+      stateError,
+
       screen,
       entry,
       navigate,
@@ -1098,6 +1207,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
+      stateLoading,
+      stateError,
       screen,
       entry,
       persisted,

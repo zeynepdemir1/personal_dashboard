@@ -121,19 +121,28 @@ tekrar site parolası sorar.
   geneli oturum korumasını uygular, ve tarayıcının doğrudan
   erişemeyeceği dış servislere (Google Calendar, Cloudinary, SerpApi,
   Telegram, Upstash) vekil (proxy) olarak görev yapar.
-- **Kalıcı veri — hangi veri nerede duruyor:**
+- **Kalıcı veri — hangi veri nerede duruyor** (bkz. PLAN.md Aşama 20):
   | Veri | Nerede | Neden |
   |---|---|---|
-  | Akademik Gelişim, Bir Şey Öğrendim, Günlük (şifreli), Linkler, Proje Fikirleri, Araştırılacak Konular, Şiir, profil adı, "Takip et" ile eklenen program kayıtları | Tarayıcının **`localStorage`**'ı | Kişisel veri — merkezi bir sunucuya hiç gitmiyor, tamamen cihazda kalıyor |
-  | Program Keşfi'nin taradığı/bulduğu sonuçlar | **Upstash Redis** (sunucu tarafı) | Tarayıcı hiç açık değilken (GitHub Actions taraması) yazılabilmesi/okunabilmesi gerekiyor — `localStorage`'a bu mümkün değil |
-  | Fotoğraflar (proje/konu/profil) | **Cloudinary** | `localStorage`'a sığmayacak kadar büyük olabiliyorlar (bkz. Aşama 15/16); `localStorage`'da sadece dönen URL duruyor |
+  | Akademik Gelişim, Bir Şey Öğrendim, Günlük (şifreli), Linkler, Proje Fikirleri, Araştırılacak Konular, Şiir, profil adı, "Takip et" ile eklenen program kayıtları | **Upstash Redis** (sunucu tarafı, `app:state` anahtarı — tek bir JSON blob) | Cihazlar arası senkronizasyon gerekiyordu — `localStorage` tarayıcıya özel olduğu için bunu sağlayamıyordu |
+  | Program Keşfi'nin taradığı/bulduğu sonuçlar | **Upstash Redis** (ayrı anahtarlar: `discover:items`/`discover:seen`) | Tarayıcı hiç açık değilken (GitHub Actions taraması) yazılabilmesi/okunabilmesi gerekiyor |
+  | Fotoğraflar (proje/konu/profil) | **Cloudinary** | Redis'e/`localStorage`'a sığmayacak kadar büyük olabiliyorlar (bkz. Aşama 15/16); durum kaydında sadece dönen URL duruyor |
 
-  Bunun pratik sonucu: `localStorage` tarayıcıya özel olduğu için, aynı
-  siteye başka bir tarayıcı/cihazdan girildiğinde kişisel içerik (notlar,
-  günlük, linkler vb.) KARŞI TARAFTA GÖRÜNMEZ — her cihazın kendi
-  `localStorage`'ı bağımsızdır. Program Keşfi sonuçları ve fotoğraflar
-  bu kuralın istisnası, çünkü onlar zaten sunucu tarafında (Upstash/
-  Cloudinary) tutuluyor, cihaza bağlı değil.
+  **Önemli — Günlük şifrelemesi hâlâ tamamen istemcide (tarayıcıda):**
+  `/api/state` gönderilen/dönen veriyi hiç yorumlamıyor, opak bir blob
+  olarak saklıyor. Günlük metinleri sunucuya ulaşmadan ÖNCE, tarayıcıda
+  Web Crypto API (AES-GCM) ile şifreleniyor — Redis'e hiçbir zaman düz
+  metin günlük içeriği gitmiyor, sadece şifreli hali. Anahtar türetimi
+  için gereken `salt` da (gizli bir sır değil, sadece bir parametre)
+  aynı blob'un parçası olarak Redis'e taşınıyor — böylece aynı parola,
+  farklı bir cihazdan girildiğinde de aynı günlüğü açabiliyor.
+
+  **Eski mimari not (artık geçerli değil):** Aşama 20 öncesinde bu veri
+  `localStorage`'da tutuluyordu ve cihazlar arası görünmüyordu; bu artık
+  düzeltildi. Kalan tek pratik sınırlama: iki cihazdan TAM EŞ ZAMANLI
+  değişiklik yapılırsa "son yazan kazanır" — bir cihazın değişikliği
+  diğerini ezebilir (tek kullanıcılı bir araç için kabul edilen bir
+  basitleştirme, gerçek bir merge/CRDT mekanizması yok).
 - **Barındırma:** **Render** (Web Service/Node) — bkz.
   [Deployment](#deployment).
 - **Yerel AI:** **Ollama** (`llama3.1:8b`) — bkz. aşağıdaki mimari karar.
@@ -164,20 +173,22 @@ için Google Cloud Console'da bir proje kaydı ve (bu kullanım kapsamı için)
 ödeme bilgisi istenmesi — kişisel/ücretsiz bir proje için orantısız bir
 gereksinim. iCal linki ise Google Calendar ayarlarından ücretsiz ve anında
 alınabiliyor. Bunun doğal sonucu: uygulamadan Google Calendar'a **geri
-yazma yok** — sadece okuma. Uygulama içinde eklenen not/dersler
-`localStorage`'da kalır, Google Calendar'a hiç gönderilmez.
+yazma yok** — sadece okuma. Uygulama içinde eklenen not/dersler kendi
+durum kaydında (Upstash Redis) kalır, Google Calendar'a hiç gönderilmez.
 
 ### Mimari Karar 3: Tek kullanıcı, merkezi deploy
 Bu proje "her kullanıcı kendi bilgisayarında kendi kopyasını çalıştırır"
 felsefesiyle DEĞİL, **tek kullanıcı + merkezi (Render'da barındırılan) bir
 deploy** olarak tasarlandı — zdemir.tech üzerinden her yerden erişilebilir,
 ama tek bir kişi (paylaşılan bir parolayla, bkz. Güvenlik) kullanır. Bunun
-mimariye iki yansıması var: (1) kullanıcının kendi verisi hâlâ
-`localStorage`'da yaşıyor (sunucunun buna erişimi yok — ör. Telegram
-bildirimi bu yüzden sadece statik/genel hatırlatmaları raporlayabiliyor,
-kullanıcının kendi eklediği notları göremiyor); (2) site herkese açık
-olduğu için (Ollama gibi tek-bilgisayara-bağlı özellikler dışında) gerçek
-bir erişim koruması (site geneli parola) şart oldu.
+mimariye bir yansıması var: site herkese açık olduğu için (Ollama gibi
+tek-bilgisayara-bağlı özellikler dışında) gerçek bir erişim koruması
+(site geneli parola) şart oldu. Kullanıcının kendi verisi artık sunucu
+tarafında (Upstash Redis, bkz. yukarıdaki "hangi veri nerede duruyor")
+merkezi olarak tutuluyor — Telegram bildirimi şu an yine de sadece
+statik/genel hatırlatmaları raporluyor (bkz. Aşama 20, "gelecek fikri"
+olarak not edildi), ama bunun sebebi artık erişim değil, kapsam dışı
+bırakılmış olması.
 
 ## Kurulum
 
@@ -270,13 +281,17 @@ Telegram/SerpApi için sunucu tarafı vekil (proxy) görevi görüyor.
 - **Google Calendar entegrasyonu tek yönlü (salt-okunur)** — uygulamadan
   Google Calendar'a not/ders eklenemez, sadece Google Calendar'daki
   etkinlikler uygulamada görüntülenir.
-- **Kullanıcının kişisel verisi merkezi bir veritabanında değil,
-  `localStorage`'da** — bkz. yukarıdaki "hangi veri nerede duruyor"
-  tablosu. Pratik sonucu: farklı bir tarayıcı/cihazdan girildiğinde
-  kişisel notlar/girişler karşı tarafta görünmez.
-- **Telegram bildirimleri sınırlı bilgiyle çalışır** — sunucunun
-  kullanıcının `localStorage`'ındaki kişisel verisine erişimi olmadığı
-  için, günlük bildirim sadece statik/genel program listesini raporlar.
+- **Eşzamanlı çoklu cihaz düzenlemesinde "son yazan kazanır"** (bkz.
+  PLAN.md Aşama 20) — kişisel içerik artık merkezi olarak Upstash
+  Redis'te tutuluyor ve cihazlar arası görünüyor, ANCAK iki cihazdan TAM
+  EŞ ZAMANLI değişiklik yapılırsa biri diğerini ezebilir; gerçek bir
+  merge/CRDT mekanizması yok (tek kullanıcılı bir araç için kabul edilen
+  bir basitleştirme).
+- **Telegram bildirimleri sınırlı bilgiyle çalışır** — kullanıcının
+  kişisel verisi artık sunucu tarafında (Upstash) erişilebilir olsa da,
+  günlük bildirim şu an hâlâ sadece statik/genel program listesini
+  raporluyor; kullanıcının kendi eklediği kayıtları da raporlamak kapsam
+  dışı bırakıldı, PLAN.md'de bir gelecek fikri olarak not edildi.
 - **Program Keşfi ayda 250 sorguluk ücretsiz SerpApi kotasıyla sınırlı** —
   haftalık taramalar bunun çok altında kalıyor ama aşırı sık manuel
   tetiklemeler kotayı tüketebilir.
@@ -300,8 +315,9 @@ Telegram/SerpApi için sunucu tarafı vekil (proxy) görevi görüyor.
   (Web Crypto API), günlük parolasından PBKDF2 (250.000 iterasyon) ile
   türetilen bir anahtarla. Günlük parolası (site parolasından ayrı, ikinci
   bir katman) hiçbir yerde saklanmıyor — sadece kilit açıkken bellekte.
-  Şifreli veri hem `localStorage`'da hem (varsa) senkronize edildiği her
-  yerde düz metin değil, base64 bir blob olarak duruyor.
+  Şifreli veri, sunucu tarafındaki durum kaydında (Upstash Redis) da
+  düz metin değil, base64 bir blob olarak duruyor — şifreleme/çözme
+  sunucuya hiç uğramıyor (bkz. Aşama 20).
 - Ortam değişkenlerinin hiçbiri istemciye (tarayıcıya gönderilen koda)
   sızmıyor — hepsi sadece `server.js`/`vite.config.ts` (Node tarafı) içinde
   okunuyor, build çıktısında aranıp doğrulandı.

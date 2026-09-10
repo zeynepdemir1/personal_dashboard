@@ -30,6 +30,29 @@ function Shell() {
   const app = useApp();
   const mobile = app.width < MOBILE_BREAKPOINT;
   const tight = app.width < 860;
+
+  // PLAN.md Aşama 20 — kişisel içerik artık sunucudan (Upstash Redis)
+  // asenkron yükleniyor. Bu kapı olmadan, ilk render varsayılan/boş
+  // state ile olurdu (istatistikler sıfır, listeler boş) — gerçek veri
+  // bir an sonra gelip her şeyi değiştirirdi, görünür bir "flaş" yapardı.
+  if (app.stateLoading) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          background: colors.bg,
+          color: colors.inkFaint,
+          fontFamily: fonts.sans,
+          fontSize: 13,
+        }}
+      >
+        Yükleniyor…
+      </div>
+    );
+  }
   // Sidebar.tsx'teki drawer genişliğiyle aynı hesap — mobilde sidebar artık
   // bir overlay olduğu için (bkz. Sidebar.tsx) bu düğme onun kenarına
   // oturmalı, açıkken içeriği yana itmiyor.
