@@ -13,7 +13,7 @@ import { deriveTitleFromUrl } from '../lib/url';
 import { fetchGoogleCalendarEvents, type GCalEvent, type GCalSyncStatus } from '../lib/googleCalendar';
 import { analyzeDiscoveredProgram, pingOllama, summarizeLearnEntry } from '../lib/ollama';
 import { dismissProgram, fetchPendingPrograms, fetchRelevantPrograms, markFilteredPrograms, type DiscoveredProgram } from '../lib/discover';
-import { formatMonthDay, referenceToday } from '../lib/dates';
+import { formatMonthDay, referenceToday, isoDateToDotDate, toDateKey } from '../lib/dates';
 import { DEFAULT_PROFILE_NAME } from '../lib/profile';
 import { BACKGROUND_IMAGES } from '../lib/backgrounds';
 import { MOBILE_BREAKPOINT } from '../lib/theme';
@@ -63,12 +63,16 @@ function parseProjectKey(key: string): ProjectKey {
   return { kind: 'static', index: parseInt(key.slice(7), 10) };
 }
 
-// Ana sayfanın haftalık/aylık takvimi sabit bir pencere gösteriyor
-// (31 Ağustos - 30 Eylül 2026) — Google Calendar senkronizasyonu da aynı
-// pencere için tek seferde çekiliyor, DayPanel ve Home bunu context'ten
-// paylaşıyor (ikisi App.tsx altında kardeş bileşen, prop geçirilemiyor).
-const GCAL_RANGE_START = new Date(2026, 7, 31);
-const GCAL_RANGE_END = new Date(2026, 8, 30, 23, 59, 59);
+// Ana sayfanın haftalık/aylık takvimi PLAN.md Aşama 22'de oklarla
+// gezilebilir hale geldi (varsayılan olarak hâlâ 31 Ağustos - 30 Eylül
+// 2026'yı gösteriyor, ama kullanıcı başka aylara/haftalara da gidebiliyor)
+// — Google Calendar .ics'i zaten TEK SEFERDE tam metin olarak çekilip
+// yerelde (parseIcs) tarih aralığına göre filtreleniyor (bkz.
+// googleCalendar.ts), yani geniş bir pencere ekstra bir ağ isteği
+// GEREKTİRMİYOR. Birkaç yıllık cömert bir pencere, makul bir gezinme
+// aralığını (geçmiş/gelecek aylar) kapsar.
+const GCAL_RANGE_START = new Date(2024, 0, 1);
+const GCAL_RANGE_END = new Date(2029, 11, 31, 23, 59, 59);
 
 const STORAGE_KEY = 'muhendis-portal-state-v1';
 
@@ -83,7 +87,7 @@ interface PersistedState {
   topicOverrides: Record<number, TopicOverride>;
   topicLinks: Record<string, RelatedLink[]>;
   projectOverrides: Record<number, ProjectOverride>;
-  dayNotes: Record<number, DayNote[]>;
+  dayNotes: Record<string, DayNote[]>;
   diaryEntries: DiaryEntryX[];
   diarySecurity: DiarySecurity | null;
   poemEntries: PoemX[];
@@ -158,6 +162,22 @@ function normalizeExtraProjects(raw: unknown): ExtraProject[] {
   });
 }
 
+// PLAN.md Aşama 22: dayNotes anahtarları eskiden "ayın kaçı" (1-30, hep
+// Eylül 2026 anlamına geliyordu) idi, artık tam YYYY-MM-DD. Canlıda
+// (Render) zaten eski numaralı anahtarlarla kaydedilmiş gerçek kullanıcı
+// verisi olabilir — bunu sessizce yeni şekle taşıyoruz (numaralı bir
+// anahtar görürsek 2026 Eylül'üne ait olduğunu varsayıp dönüştürüyoruz).
+function normalizeDayNotes(raw: unknown): Record<string, DayNote[]> {
+  if (!raw || typeof raw !== 'object') return JSON.parse(JSON.stringify(SEED_DAY_NOTES));
+  const out: Record<string, DayNote[]> = {};
+  for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
+    if (!Array.isArray(val)) continue;
+    const dateKey = /^\d+$/.test(key) ? `2026-09-${key.padStart(2, '0')}` : key;
+    out[dateKey] = val as DayNote[];
+  }
+  return out;
+}
+
 // PLAN.md Aşama 20: kişisel içerik artık localStorage yerine sunucuda
 // (Upstash Redis, `/api/state`) tutuluyor — bu fonksiyon, ister sunucudan
 // gelsin ister eski localStorage'dan (tek seferlik geçiş, bkz. aşağıdaki
@@ -179,6 +199,7 @@ function normalizeLoadedState(parsed: unknown, mobile: boolean): PersistedState 
         ? (p.diarySecurity as DiarySecurity)
         : null,
     poemEntries: Array.isArray(p.poemEntries) ? (p.poemEntries as PoemX[]) : base.poemEntries,
+    dayNotes: p.dayNotes ? normalizeDayNotes(p.dayNotes) : base.dayNotes,
     profileName: typeof p.profileName === 'string' && p.profileName.trim() ? p.profileName : base.profileName,
     profilePhoto: typeof p.profilePhoto === 'string' ? p.profilePhoto : null,
     backgroundImages:
@@ -254,6 +275,12 @@ export interface AppStateValue {
   addingProgram: boolean;
   qProgram: string;
   setQProgram: (v: string) => void;
+  qProgramDate: string;
+  setQProgramDate: (v: string) => void;
+  qProgramNote: string;
+  setQProgramNote: (v: string) => void;
+  qProgramLink: string;
+  setQProgramLink: (v: string) => void;
   startAddProgram: () => void;
   saveProgram: () => void;
 
@@ -262,6 +289,7 @@ export interface AppStateValue {
   removeProgramFile: (title: string) => void;
   updateExtraProgram: (id: string, patch: Partial<ExtraProgram>) => void;
   removeExtraProgramFile: (id: string) => void;
+  removeExtraProgram: (id: string) => void;
 
   qLink: string;
   setQLink: (v: string) => void;
@@ -332,16 +360,17 @@ export interface AppStateValue {
   calView: 'week' | 'month';
   setCalView: (v: 'week' | 'month') => void;
 
-  dayNotes: Record<number, DayNote[]>;
-  dayPanel: number | null;
+  dayNotes: Record<string, DayNote[]>;
+  dayPanel: string | null;
   dayPanelInput: string;
   dayPanelTime: string;
-  openDayPanel: (day: number) => void;
+  openDayPanel: (dateKey: string) => void;
   closeDayPanel: () => void;
   setDayPanelInput: (v: string) => void;
   setDayPanelTime: (v: string) => void;
   addDayPanelItem: () => void;
-  removeDayNote: (day: number, id: string) => void;
+  removeDayNote: (dateKey: string, id: string) => void;
+  editDayNote: (dateKey: string, id: string, patch: Partial<Pick<DayNote, 'time' | 'end' | 'label'>>) => void;
 
   linkMenu: LinkMenuData | null;
   openLinkMenu: (link: LinkMenuData) => void;
@@ -596,6 +625,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [qProfileName, setQProfileName] = useState('');
   const [addingProgram, setAddingProgram] = useState(false);
   const [qProgram, setQProgram] = useState('');
+  const [qProgramDate, setQProgramDate] = useState('');
+  const [qProgramNote, setQProgramNote] = useState('');
+  const [qProgramLink, setQProgramLink] = useState('');
   const [qLink, setQLink] = useState('');
   const [addingLinkForm, setAddingLinkForm] = useState(false);
   const [qLinkTitle, setQLinkTitle] = useState('');
@@ -607,7 +639,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [addingLearnEntry, setAddingLearnEntry] = useState(false);
   const [qLearnTitle, setQLearnTitle] = useState('');
   const [qLearnBody, setQLearnBody] = useState('');
-  const [dayPanel, setDayPanel] = useState<number | null>(null);
+  const [dayPanel, setDayPanel] = useState<string | null>(null);
   const [dayPanelInput, setDayPanelInput] = useState('');
   const [dayPanelTime, setDayPanelTime] = useState('');
   const [linkMenu, setLinkMenu] = useState<LinkMenuData | null>(null);
@@ -808,14 +840,36 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       addingProgram,
       qProgram,
       setQProgram,
-      startAddProgram: () => setAddingProgram(true),
+      qProgramDate,
+      setQProgramDate,
+      qProgramNote,
+      setQProgramNote,
+      qProgramLink,
+      setQProgramLink,
+      startAddProgram: () => {
+        setAddingProgram(true);
+        setQProgramDate(toDateKey(referenceToday()));
+      },
       saveProgram: () => {
         const v = qProgram.trim();
         if (!v) return;
+        const date = isoDateToDotDate(qProgramDate) || TODAY;
         patch({
-          extraPrograms: [...persistedRef.current.extraPrograms, { id: makeId('program'), title: v, date: TODAY, note: '' }],
+          extraPrograms: [
+            ...persistedRef.current.extraPrograms,
+            {
+              id: makeId('program'),
+              title: v,
+              date,
+              note: qProgramNote.trim(),
+              link: qProgramLink.trim() || undefined,
+            },
+          ],
         });
         setQProgram('');
+        setQProgramDate('');
+        setQProgramNote('');
+        setQProgramLink('');
         setAddingProgram(false);
       },
 
@@ -847,6 +901,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             x.id === id ? { ...x, fileName: undefined, fileData: undefined } : x,
           ),
         });
+      },
+      removeExtraProgram: (id: string) => {
+        patch({ extraPrograms: persistedRef.current.extraPrograms.filter((x) => x.id !== id) });
       },
 
       qLink,
@@ -1172,8 +1229,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       dayPanel,
       dayPanelInput,
       dayPanelTime,
-      openDayPanel: (day: number) => {
-        setDayPanel(day);
+      openDayPanel: (dateKey: string) => {
+        setDayPanel(dateKey);
         setDayPanelInput('');
         setDayPanelTime('');
       },
@@ -1184,7 +1241,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (dayPanel == null || !dayPanelInput.trim()) return;
         const d = dayPanel;
         const newItem: DayNote = {
-          id: `${d}-${Date.now()}`,
+          id: makeId(d),
           time: dayPanelTime || '',
           label: dayPanelInput.trim(),
         };
@@ -1197,11 +1254,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setDayPanelInput('');
         setDayPanelTime('');
       },
-      removeDayNote: (day: number, id: string) => {
+      removeDayNote: (dateKey: string, id: string) => {
         patch({
           dayNotes: {
             ...persistedRef.current.dayNotes,
-            [day]: (persistedRef.current.dayNotes[day] || []).filter((x) => x.id !== id),
+            [dateKey]: (persistedRef.current.dayNotes[dateKey] || []).filter((x) => x.id !== id),
+          },
+        });
+      },
+      editDayNote: (dateKey: string, id: string, p: Partial<Pick<DayNote, 'time' | 'end' | 'label'>>) => {
+        patch({
+          dayNotes: {
+            ...persistedRef.current.dayNotes,
+            [dateKey]: (persistedRef.current.dayNotes[dateKey] || []).map((x) => (x.id === id ? { ...x, ...p } : x)),
           },
         });
       },
@@ -1244,6 +1309,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       diaryUnlockError,
       addingProgram,
       qProgram,
+      qProgramDate,
+      qProgramNote,
+      qProgramLink,
       qLink,
       addingLinkForm,
       qLinkTitle,

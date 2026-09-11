@@ -1,9 +1,22 @@
 import { useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useApp } from '../../state/AppState';
 import { colors, fonts, pillStyle, dayBlockStyle, gcalBlockStyle, HOUR_ROW_HEIGHT, MOBILE_BREAKPOINT } from '../../lib/theme';
-import { LINKS, PROGRAMS, TOPICS, AUG31_BLOCKS, timeToHour, TODAY } from '../../lib/data';
+import { LINKS, PROGRAMS, TOPICS, timeToHour, TODAY } from '../../lib/data';
 import { computeHomeStats, computeClosedTopicsThisMonth } from '../../lib/stats';
-import { daysLeftUntil, daysLeftColor, formatDaysLeft, formatMonthDay, parseDotDate } from '../../lib/dates';
+import {
+  daysLeftUntil,
+  daysLeftColor,
+  formatDaysLeft,
+  formatMonthDay,
+  parseDotDate,
+  MONTH_ABBR_TR,
+  MONTH_FULL_TR,
+  toDateKey,
+  startOfWeek,
+  addDays,
+  addMonths,
+  referenceToday,
+} from '../../lib/dates';
 import { SEED_LEARN_ENTRIES } from '../../lib/learn';
 import { eventsOnDate } from '../../lib/googleCalendar';
 import { compressImage } from '../../lib/image';
@@ -16,18 +29,15 @@ const HOUR_LABELS = [
   '15:00', '16:00', '17:00', '18:00', '19:00', '20:00',
 ];
 
-const DAY_DEFS: { label: string; date: string; dayNum: number | null }[] = [
-  { label: 'PZT', date: '31 Ağu', dayNum: null },
-  { label: 'SAL', date: '1 Eyl', dayNum: 1 },
-  { label: 'ÇAR', date: '2 Eyl', dayNum: 2 },
-  { label: 'PER', date: '3 Eyl', dayNum: 3 },
-  { label: 'CUM', date: '4 Eyl', dayNum: 4 },
-  { label: 'CMT', date: '5 Eyl', dayNum: 5 },
-  { label: 'PAZ', date: '6 Eyl', dayNum: 6 },
-];
-
 const WEEKDAY_LABELS = ['PZT', 'SAL', 'ÇAR', 'PER', 'CUM', 'CMT', 'PAZ'];
-const START_OFFSET = 1; // 1 Eylül 2026 = Salı → Pazartesi hücresi boş
+
+// PLAN.md Aşama 22: takvim artık sabit bir pencereye kilitli değil, oklarla
+// gezilebiliyor — varsayılan "çapa" (anchor) tarih, önceki sabit pencereyle
+// AYNI görünümü verecek şekilde seçildi: 1 Eylül 2026 Salı günü — o haftanın
+// (Pazartesi başlangıçlı) Pazartesi'si 31 Ağustos, yani hafta görünümü
+// eskisiyle birebir aynı; ay görünümü de Eylül 2026'yı gösteriyor (eskisiyle
+// aynı varsayılan).
+const DEFAULT_ANCHOR = new Date(2026, 8, 1);
 
 export function Home() {
   const app = useApp();
@@ -82,9 +92,11 @@ export function Home() {
 
   // Program Takvimi ile aynı tek kaynak (PROGRAMS) — burada ayrıca
   // kopyalanmış bir liste yok, sadece en yakın 3 tanesi gösteriliyor.
+  // `id` sadece "eklediğim" (extra) programlarda var — Ana Sayfa'daki
+  // silme ikonu bu yüzden sadece onlarda görünüyor, seed veride değil.
   const allPrograms = [
-    ...PROGRAMS,
-    ...app.extraPrograms.map((p) => ({ date: p.date, title: p.title, note: p.note || 'Ana sayfadan eklendi' })),
+    ...PROGRAMS.map((p) => ({ date: p.date, title: p.title, note: p.note, id: undefined as string | undefined })),
+    ...app.extraPrograms.map((p) => ({ date: p.date, title: p.title, note: p.note || 'Ana sayfadan eklendi', id: p.id as string | undefined })),
   ];
   const upcoming = allPrograms
     .map((p) => ({ ...p, daysLeft: daysLeftUntil(p.date) }))
@@ -94,6 +106,7 @@ export function Home() {
     .map((p) => {
       const { month, day } = formatMonthDay(parseDotDate(p.date)!);
       return {
+        id: p.id,
         month,
         day,
         title: p.title,
@@ -143,6 +156,26 @@ export function Home() {
   const projectFileRef = useRef<HTMLInputElement>(null);
   const [topicPhotoError, setTopicPhotoError] = useState<string | null>(null);
   const [projectPhotoError, setProjectPhotoError] = useState<string | null>(null);
+
+  // PLAN.md Aşama 22: hafta/ay oklarla gezilebiliyor. Tek bir "çapa" tarih
+  // her iki görünümü de sürüyor — hafta görünümü çapanın içinde olduğu
+  // haftayı, ay görünümü çapanın ayını gösteriyor. Sekmeler arası geçişte
+  // (Haftalık ↔ Aylık) bilerek SIFIRLANMIYOR, ör. Ekim'e gidip Aylık'tan
+  // Haftalık'a geçersen Ekim'in bir haftasını görürsün.
+  const [anchorDate, setAnchorDate] = useState(() => DEFAULT_ANCHOR);
+  const goPrevPeriod = () => setAnchorDate((d) => (app.calView === 'week' ? addDays(d, -7) : addMonths(d, -1)));
+  const goNextPeriod = () => setAnchorDate((d) => (app.calView === 'week' ? addDays(d, 7) : addMonths(d, 1)));
+  const periodLabel =
+    app.calView === 'week'
+      ? (() => {
+          const start = startOfWeek(anchorDate);
+          const end = addDays(start, 6);
+          const sameMonth = start.getMonth() === end.getMonth();
+          const startLabel = `${start.getDate()} ${MONTH_ABBR_TR[start.getMonth()]}`;
+          const endLabel = sameMonth ? `${end.getDate()}` : `${end.getDate()} ${MONTH_ABBR_TR[end.getMonth()]}`;
+          return `${startLabel} – ${endLabel} ${end.getFullYear()}`;
+        })()
+      : `${MONTH_FULL_TR[anchorDate.getMonth()]} ${anchorDate.getFullYear()}`;
 
   const handleTopicPhoto = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -230,24 +263,60 @@ export function Home() {
                 <div style={{ fontFamily: fonts.sans, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.inkFainter }}>{u.month}</div>
                 <div style={{ fontFamily: fonts.serif, fontSize: 20, lineHeight: 1.1, color: colors.ink }}>{u.day}</div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 2 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 2, flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: colors.ink }}>{u.title}</div>
                 <div style={{ fontSize: 12, color: colors.inkSoft, lineHeight: 1.5 }}>{u.note}</div>
                 <div style={{ fontFamily: fonts.sans, fontSize: 10, color: u.color, letterSpacing: '0.06em' }}>{u.left}</div>
               </div>
+              {u.id && (
+                <span
+                  onClick={() => app.removeExtraProgram(u.id!)}
+                  className="text-hover-red"
+                  title="Programı sil"
+                  style={{ cursor: 'pointer', color: colors.placeholderText, padding: 4, flex: '0 0 auto' }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  </svg>
+                </span>
+              )}
             </div>
           ))}
 
           {app.addingProgram && (
-            <div style={{ display: 'flex', gap: 8, paddingTop: 6 }}>
-              <input
-                value={app.qProgram}
-                onChange={(e) => app.setQProgram(e.target.value)}
-                placeholder="Program adı ve tarih…"
-                style={{ flex: 1, padding: '9px 11px', border: `1px solid ${colors.borderStrong}`, background: colors.panel, fontSize: 13, color: colors.ink, outline: 'none', borderRadius: 3 }}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 6 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={app.qProgram}
+                  onChange={(e) => app.setQProgram(e.target.value)}
+                  placeholder="Program adı…"
+                  style={{ flex: 1, padding: '9px 11px', border: `1px solid ${colors.borderStrong}`, background: colors.panel, fontSize: 13, color: colors.ink, outline: 'none', borderRadius: 3 }}
+                />
+                <input
+                  type="date"
+                  value={app.qProgramDate}
+                  onChange={(e) => app.setQProgramDate(e.target.value)}
+                  style={{ flex: '0 0 152px', padding: '9px 11px', border: `1px solid ${colors.borderStrong}`, background: colors.panel, fontSize: 13, color: colors.ink, outline: 'none', borderRadius: 3 }}
+                />
+              </div>
+              <textarea
+                value={app.qProgramNote}
+                onChange={(e) => app.setQProgramNote(e.target.value)}
+                placeholder="Not (opsiyonel)…"
+                style={{ padding: '9px 11px', border: `1px solid ${colors.borderStrong}`, background: colors.panel, fontSize: 13, color: colors.ink, outline: 'none', borderRadius: 3, minHeight: 44, resize: 'vertical' }}
               />
-              <div onClick={app.saveProgram} className="btn-dark" style={{ padding: '9px 14px', fontSize: 12.5, cursor: 'pointer', borderRadius: 3, whiteSpace: 'nowrap' }}>
-                Ekle
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={app.qProgramLink}
+                  onChange={(e) => app.setQProgramLink(e.target.value)}
+                  placeholder="Link (opsiyonel)…"
+                  style={{ flex: 1, padding: '9px 11px', border: `1px solid ${colors.borderStrong}`, background: colors.panel, fontSize: 13, color: colors.ink, outline: 'none', borderRadius: 3 }}
+                />
+                <div onClick={app.saveProgram} className="btn-dark" style={{ padding: '9px 14px', fontSize: 12.5, cursor: 'pointer', borderRadius: 3, whiteSpace: 'nowrap' }}>
+                  Ekle
+                </div>
               </div>
             </div>
           )}
@@ -380,6 +449,49 @@ export function Home() {
               <div style={pillStyle(app.calView === 'week')} onClick={() => app.setCalView('week')}>Haftalık</div>
               <div style={pillStyle(app.calView === 'month')} onClick={() => app.setCalView('month')}>Aylık</div>
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span
+                onClick={goPrevPeriod}
+                className="hover-row"
+                title={app.calView === 'week' ? 'Önceki hafta' : 'Önceki ay'}
+                style={{
+                  cursor: 'pointer',
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  border: `1px solid ${colors.borderStrong}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 13,
+                  color: colors.inkSoft,
+                }}
+              >
+                ‹
+              </span>
+              <span style={{ fontFamily: fonts.sans, fontSize: 11.5, color: colors.inkSoft, minWidth: 108, textAlign: 'center' }}>
+                {periodLabel}
+              </span>
+              <span
+                onClick={goNextPeriod}
+                className="hover-row"
+                title={app.calView === 'week' ? 'Sonraki hafta' : 'Sonraki ay'}
+                style={{
+                  cursor: 'pointer',
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  border: `1px solid ${colors.borderStrong}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 13,
+                  color: colors.inkSoft,
+                }}
+              >
+                ›
+              </span>
+            </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: fonts.sans, fontSize: 10.5, color: colors.inkFaint }}>
@@ -398,10 +510,7 @@ export function Home() {
                   : 'Google Calendar bağlı değil'}
             </span>
             <span
-              onClick={() => {
-                const realDay = now.getDate();
-                app.openDayPanel(realDay >= 1 && realDay <= 30 ? realDay : 1);
-              }}
+              onClick={() => app.openDayPanel(toDateKey(referenceToday()))}
               className="hover-underline"
               style={{ fontFamily: fonts.sans, fontSize: 11, color: colors.rose, cursor: 'pointer', borderBottom: '1px solid transparent', paddingBottom: 1 }}
             >
@@ -410,7 +519,7 @@ export function Home() {
           </div>
         </div>
 
-        {app.calView === 'week' ? <WeekView /> : <MonthView />}
+        {app.calView === 'week' ? <WeekView anchorDate={anchorDate} /> : <MonthView anchorDate={anchorDate} />}
       </section>
     </div>
   );
@@ -496,7 +605,7 @@ function DiscoveredProgramsWidget() {
   );
 }
 
-function WeekView() {
+function WeekView({ anchorDate }: { anchorDate: Date }) {
   const app = useApp();
   // 7 gün + saat sütunu, telefon genişliğinde orantısal (1fr) sütunlara
   // sıkıştırılınca her gün ~40px'e düşüp tamamen okunaksız hale geliyordu
@@ -504,20 +613,19 @@ function WeekView() {
   // genişlik veriyoruz ve sadece bu widget'ı yatay kaydırılabilir
   // yapıyoruz — sayfanın geri kalanı yatayda kaymıyor, sadece takvim.
   const mobile = app.width < MOBILE_BREAKPOINT;
-  const weekDays = DAY_DEFS.map((d) => {
-    const rawBlocks =
-      d.dayNum === null
-        ? AUG31_BLOCKS
-        : (app.dayNotes[d.dayNum] || [])
-            .filter((it) => it.time)
-            .map((it) => ({
-              s: timeToHour(it.time) as number,
-              e: it.end ? (timeToHour(it.end) as number) : (timeToHour(it.time) as number) + 1,
-              label: it.label,
-            }));
+  const weekStart = startOfWeek(anchorDate);
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const date = addDays(weekStart, i);
+    const dateKey = toDateKey(date);
+    const rawBlocks = (app.dayNotes[dateKey] || [])
+      .filter((it) => it.time)
+      .map((it) => ({
+        s: timeToHour(it.time) as number,
+        e: it.end ? (timeToHour(it.end) as number) : (timeToHour(it.time) as number) + 1,
+        label: it.label,
+      }));
 
-    const [year, month, day] = d.dayNum === null ? [2026, 7, 31] : [2026, 8, d.dayNum];
-    const gcalBlocks = eventsOnDate(app.gcalEvents, year, month, day)
+    const gcalBlocks = eventsOnDate(app.gcalEvents, date.getFullYear(), date.getMonth(), date.getDate())
       .filter((ev) => !ev.allDay)
       .map((ev) => ({
         s: ev.start.getHours() + ev.start.getMinutes() / 60,
@@ -526,7 +634,13 @@ function WeekView() {
       }))
       .filter((b) => b.s >= 8 && b.e <= 21);
 
-    return { ...d, blocks: rawBlocks, gcalBlocks };
+    return {
+      label: WEEKDAY_LABELS[i],
+      date: `${date.getDate()} ${MONTH_ABBR_TR[date.getMonth()]}`,
+      dateKey,
+      blocks: rawBlocks,
+      gcalBlocks,
+    };
   });
 
   return (
@@ -547,7 +661,12 @@ function WeekView() {
       <div />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: `1px solid ${colors.border}` }}>
         {weekDays.map((d, i) => (
-          <div key={i} style={{ padding: '16px 8px', textAlign: 'center', borderLeft: '1px solid #EEDFDF' }}>
+          <div
+            key={i}
+            onClick={() => app.openDayPanel(d.dateKey)}
+            className="hover-row-alt"
+            style={{ padding: '16px 8px', textAlign: 'center', borderLeft: '1px solid #EEDFDF', cursor: 'pointer' }}
+          >
             <div style={{ fontFamily: fonts.sans, fontSize: 10.5, letterSpacing: '0.08em', color: colors.inkFaint }}>{d.label}</div>
             <div style={{ fontFamily: fonts.serif, fontSize: 17, color: colors.ink, marginTop: 2 }}>{d.date}</div>
           </div>
@@ -593,18 +712,27 @@ function WeekView() {
   );
 }
 
-function MonthView() {
+function MonthView({ anchorDate }: { anchorDate: Date }) {
   const app = useApp();
+  const year = anchorDate.getFullYear();
+  const month = anchorDate.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  // Pazartesi başlangıçlı ızgara: ayın 1'i hangi gün olursa olsun,
+  // önündeki boş hücre sayısı (0 = zaten Pazartesi).
+  const offset = (firstOfMonth.getDay() + 6) % 7;
+
   const monthCells = Array.from({ length: 42 }, (_, i) => {
-    const dayNum = i - START_OFFSET + 1;
-    const valid = dayNum >= 1 && dayNum <= 30;
-    const localCount = valid ? (app.dayNotes[dayNum] || []).length : 0;
-    const gcalCount = valid ? eventsOnDate(app.gcalEvents, 2026, 8, dayNum).length : 0;
+    const dayNum = i - offset + 1;
+    const valid = dayNum >= 1 && dayNum <= daysInMonth;
+    const dateKey = valid ? toDateKey(new Date(year, month, dayNum)) : '';
+    const localCount = valid ? (app.dayNotes[dateKey] || []).length : 0;
+    const gcalCount = valid ? eventsOnDate(app.gcalEvents, year, month, dayNum).length : 0;
     return {
       day: valid ? dayNum : '',
       localDots: Array.from({ length: Math.min(localCount, 4) }),
       gcalDots: Array.from({ length: Math.min(gcalCount, 4 - Math.min(localCount, 4)) }),
-      open: valid ? () => app.openDayPanel(dayNum) : undefined,
+      open: valid ? () => app.openDayPanel(dateKey) : undefined,
       valid,
     };
   });

@@ -403,46 +403,50 @@ export interface DayNote {
   label: string;
 }
 
-export const SEED_DAY_NOTES: Record<number, DayNote[]> = {
-  1: [
+// PLAN.md Aşama 22: anahtarlar artık "ayın kaçı" (1-30) değil, tam
+// YYYY-MM-DD tarih — takvim oklarla farklı aylara gezilebildiği için bir
+// gün numarası tek başına artık belirsiz (Eylül'ün 5'i mi, Ekim'in 5'i
+// mi?). 31 Ağustos (eskiden ayrı bir AUG31_BLOCKS sabiti olarak özel
+// işleniyordu) artık aynı yapının normal bir günü.
+export const SEED_DAY_NOTES: Record<string, DayNote[]> = {
+  '2026-08-31': [
+    { id: 'aug31-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' },
+    { id: 'aug31-1', time: '14:00', end: '14:30', label: 'Kütüphane rezervasyonu' },
+  ],
+  '2026-09-01': [
     { id: '1-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' },
     { id: '1-1', time: '16:00', end: '17:00', label: 'TÜBİTAK bütçe tablosu' },
   ],
-  2: [
+  '2026-09-02': [
     { id: '2-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' },
     { id: '2-1', time: '13:00', end: '15:00', label: 'Proje toplantısı' },
   ],
-  3: [{ id: '3-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
-  4: [{ id: '4-0', time: '11:00', end: '12:30', label: 'Sayısal Analiz dersi' }],
-  5: [{ id: '5-0', time: '18:00', end: '19:00', label: 'Şiir yazma zamanı' }],
-  6: [],
-  8: [{ id: '8-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
-  9: [{ id: '9-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
-  10: [{ id: '10-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
-  11: [{ id: '11-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
-  15: [
+  '2026-09-03': [{ id: '3-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
+  '2026-09-04': [{ id: '4-0', time: '11:00', end: '12:30', label: 'Sayısal Analiz dersi' }],
+  '2026-09-05': [{ id: '5-0', time: '18:00', end: '19:00', label: 'Şiir yazma zamanı' }],
+  '2026-09-06': [],
+  '2026-09-08': [{ id: '8-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
+  '2026-09-09': [{ id: '9-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
+  '2026-09-10': [{ id: '10-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
+  '2026-09-11': [{ id: '11-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
+  '2026-09-15': [
     { id: '15-0', time: '', label: 'TÜBİTAK 2209-A son başvuru' },
     { id: '15-1', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' },
     { id: '15-2', time: '13:00', end: '15:00', label: 'Proje toplantısı' },
   ],
-  16: [{ id: '16-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
-  17: [{ id: '17-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
-  18: [{ id: '18-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
-  22: [{ id: '22-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
-  23: [
+  '2026-09-16': [{ id: '16-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
+  '2026-09-17': [{ id: '17-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
+  '2026-09-18': [{ id: '18-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
+  '2026-09-22': [{ id: '22-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
+  '2026-09-23': [
     { id: '23-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' },
     { id: '23-1', time: '16:00', end: '17:00', label: 'TEKNOFEST takım toplantısı' },
   ],
-  24: [{ id: '24-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
-  25: [{ id: '25-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
-  29: [{ id: '29-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
-  30: [{ id: '30-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
+  '2026-09-24': [{ id: '24-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
+  '2026-09-25': [{ id: '25-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
+  '2026-09-29': [{ id: '29-0', time: '09:00', end: '10:30', label: 'Kontrol Sistemleri dersi' }],
+  '2026-09-30': [{ id: '30-0', time: '10:00', end: '12:00', label: 'Sinyaller ve Sistemler Lab' }],
 };
-
-export const AUG31_BLOCKS = [
-  { s: 9, e: 10.5, label: 'Kontrol Sistemleri dersi' },
-  { s: 14, e: 14.5, label: 'Kütüphane rezervasyonu' },
-];
 
 // Uygulamanın "bugün"ü — ana sayfadaki karşılama başlığıyla ("31 Ağustos 2026 ·
 // Pazartesi") aynı referans tarih. Yeni eklenen kayıtlar ve istatistik

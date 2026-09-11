@@ -1,8 +1,8 @@
-import { useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useApp } from '../../state/AppState';
 import { colors, fonts } from '../../lib/theme';
 import { PROGRAMS } from '../../lib/data';
-import { daysLeftUntil, daysLeftColor, formatDaysLeft } from '../../lib/dates';
+import { daysLeftUntil, daysLeftColor, formatDaysLeft, dotDateToIsoDate, isoDateToDotDate } from '../../lib/dates';
 import { readFileAsDataUrl, MAX_FILE_BYTES } from '../../lib/file';
 
 interface DisplayProgram {
@@ -18,13 +18,27 @@ interface DisplayProgram {
   color: string;
 }
 
+interface Draft {
+  title: string;
+  date: string;
+  note: string;
+  link: string;
+}
+
 export function CalendarScreen() {
   const app = useApp();
   const narrow = app.width < 1180;
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [saved, setSaved] = useState(false);
+  const savedTimeoutRef = useRef<number | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pendingFileKey = useRef<string | null>(null);
+
+  useEffect(() => () => {
+    if (savedTimeoutRef.current) window.clearTimeout(savedTimeoutRef.current);
+  }, []);
 
   const listGrid: CSSProperties = narrow
     ? { display: 'flex', flexDirection: 'column', gap: 6, padding: '18px 6px', borderBottom: '1px solid #F1E4E4' }
@@ -67,14 +81,43 @@ export function CalendarScreen() {
     };
   });
 
-  const saveNote = (p: DisplayProgram, note: string) => {
-    if (p.key.startsWith('extra:')) app.updateExtraProgram(p.key.slice(6), { note });
-    else app.updateProgramAttachment(p.title, { note });
+  const toggleRow = (p: DisplayProgram) => {
+    if (expanded === p.key) {
+      setExpanded(null);
+      setDraft(null);
+      return;
+    }
+    setExpanded(p.key);
+    setDraft({ title: p.title, date: p.date, note: p.note, link: p.link ?? '' });
+    setSaved(false);
+    setFileError(null);
   };
-  const saveLink = (p: DisplayProgram, link: string) => {
-    if (p.key.startsWith('extra:')) app.updateExtraProgram(p.key.slice(6), { link });
-    else app.updateProgramAttachment(p.title, { link });
+
+  const saveDraft = (p: DisplayProgram) => {
+    if (!draft) return;
+    const isExtra = p.key.startsWith('extra:');
+    if (isExtra) {
+      const date = isoDateToDotDate(draft.date) || p.date;
+      app.updateExtraProgram(p.key.slice(6), {
+        title: draft.title.trim() || p.title,
+        date,
+        note: draft.note,
+        link: draft.link.trim() || undefined,
+      });
+    } else {
+      app.updateProgramAttachment(p.title, { note: draft.note, link: draft.link.trim() || undefined });
+    }
+    setSaved(true);
+    if (savedTimeoutRef.current) window.clearTimeout(savedTimeoutRef.current);
+    savedTimeoutRef.current = window.setTimeout(() => setSaved(false), 2200);
   };
+
+  const removeProgram = (p: DisplayProgram) => {
+    app.removeExtraProgram(p.key.slice(6));
+    setExpanded(null);
+    setDraft(null);
+  };
+
   const removeFile = (p: DisplayProgram) => {
     if (p.key.startsWith('extra:')) app.removeExtraProgramFile(p.key.slice(6));
     else app.removeProgramFile(p.title);
@@ -122,10 +165,11 @@ export function CalendarScreen() {
       <div style={{ display: 'flex', flexDirection: 'column', borderTop: `1px solid ${colors.border}` }}>
         {programs.map((p) => {
           const isOpen = expanded === p.key;
+          const isExtra = p.key.startsWith('extra:');
           return (
             <div key={p.key} style={{ borderBottom: '1px solid #F1E4E4' }}>
               <div
-                onClick={() => setExpanded(isOpen ? null : p.key)}
+                onClick={() => toggleRow(p)}
                 className="hover-row-alt"
                 style={{ ...listGrid, borderBottom: 'none', cursor: 'pointer' }}
               >
@@ -144,13 +188,34 @@ export function CalendarScreen() {
                 </span>
               </div>
 
-              {isOpen && (
+              {isOpen && draft && (
                 <div style={{ padding: '4px 6px 20px', display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 480 }}>
+                  {isExtra && (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+                        <span style={{ fontSize: 10.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.inkFaint }}>Başlık</span>
+                        <input
+                          value={draft.title}
+                          onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+                          style={inputStyle}
+                        />
+                      </label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 160px' }}>
+                        <span style={{ fontSize: 10.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.inkFaint }}>Tarih</span>
+                        <input
+                          type="date"
+                          value={dotDateToIsoDate(draft.date) || draft.date}
+                          onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                          style={inputStyle}
+                        />
+                      </label>
+                    </div>
+                  )}
                   <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <span style={{ fontSize: 10.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.inkFaint }}>Not</span>
                     <textarea
-                      defaultValue={p.note}
-                      onBlur={(e) => saveNote(p, e.target.value)}
+                      value={draft.note}
+                      onChange={(e) => setDraft({ ...draft, note: e.target.value })}
                       placeholder="Bu program için kişisel not…"
                       style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }}
                     />
@@ -159,8 +224,8 @@ export function CalendarScreen() {
                     <span style={{ fontSize: 10.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.inkFaint }}>Link</span>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <input
-                        defaultValue={p.link ?? ''}
-                        onBlur={(e) => saveLink(p, e.target.value)}
+                        value={draft.link}
+                        onChange={(e) => setDraft({ ...draft, link: e.target.value })}
                         placeholder="https://…"
                         style={inputStyle}
                       />
@@ -199,6 +264,24 @@ export function CalendarScreen() {
                     )}
                     {fileError && expanded === p.key && (
                       <span style={{ fontSize: 11, color: '#B0554F' }}>{fileError}</span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 4 }}>
+                    <div onClick={() => saveDraft(p)} className="btn-dark" style={{ padding: '9px 16px', fontSize: 12.5, cursor: 'pointer', borderRadius: 3 }}>
+                      Kaydet
+                    </div>
+                    {saved && (
+                      <span style={{ fontSize: 12, color: '#6E9E7E', fontWeight: 500 }}>✓ Kaydedildi</span>
+                    )}
+                    {isExtra && (
+                      <span
+                        onClick={() => removeProgram(p)}
+                        className="text-hover-red"
+                        style={{ cursor: 'pointer', fontSize: 12, color: colors.placeholderText, marginLeft: 'auto' }}
+                      >
+                        Programı sil
+                      </span>
                     )}
                   </div>
                 </div>

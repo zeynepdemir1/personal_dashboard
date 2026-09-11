@@ -39,8 +39,67 @@ export function daysLeftColor(daysLeft: number): string {
   return '#9DA3A4';
 }
 
-const MONTH_ABBR_TR = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+export const MONTH_ABBR_TR = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+export const MONTH_FULL_TR = [
+  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
+];
 
 export function formatMonthDay(date: Date): { month: string; day: string } {
   return { month: MONTH_ABBR_TR[date.getMonth()], day: String(date.getDate()).padStart(2, '0') };
+}
+
+// PLAN.md Aşama 22: Ana Sayfa'daki takvim ızgarası (hafta/ay) artık
+// oklarla gezilebiliyor — bu yüzden hangi hafta/ay gösterildiğini gerçek
+// bir Date ile ifade etmek, gün notlarını da (dayNotes) sadece "ayın kaçı"
+// (1-30) yerine tam bir tarihle (YYYY-MM-DD) anahtarlamak gerekti; aksi
+// halde Eylül'ün 5'i ile Ekim'in 5'i aynı anahtarı paylaşırdı.
+export function toDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function parseDateKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// Pazartesi başlangıçlı hafta (uygulamanın geri kalanıyla — PZT,SAL,...,PAZ
+// etiketleriyle — tutarlı olsun diye).
+export function startOfWeek(date: Date): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay(); // 0 = Pazar .. 6 = Cumartesi
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+export function addDays(date: Date, n: number): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+export function addMonths(date: Date, n: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + n, 1);
+}
+
+export function formatFullDateTR(date: Date): string {
+  return `${date.getDate()} ${MONTH_FULL_TR[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+// <input type="date"> 'YYYY-MM-DD' döndürür; uygulamanın geri kalanı
+// (daysLeftUntil, parseDotDate, PROGRAMS seed verisi) 'DD.MM.YYYY' kullanıyor.
+export function isoDateToDotDate(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return '';
+  return `${d}.${m}.${y}`;
+}
+
+export function dotDateToIsoDate(dot: string): string {
+  const [d, m, y] = dot.split('.');
+  if (!d || !m || !y) return '';
+  return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
 }

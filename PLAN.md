@@ -343,6 +343,38 @@ Zeynep'in ek sorusu: günlük şifrelemesi bir "salt" kullanıyorsa ve bu salt s
 ### Uçtan uca doğrulama
 Gerçek bir dosya yükleyip Redis'teki `/api/state` kaydı doğrudan okunarak doğrulandı: yükleme öncesi 12 fotoğraf → yükleme sonrası 13 (yeni gerçek bir Cloudinary URL'i listede) → "sil" sonrası 12 → art arda silmelerle 1'e kadar düşürüldü → son fotoğrafı silme denemesi doğru şekilde engellendi ("Son fotoğraf silinemez" mesajı gösterildi, liste 1'de kaldı). Test, gerçek `app:state` anahtarına dokunmadan geçici bir test anahtarıyla yapıldı (bkz. Aşama 20'deki aynı test-güvenliği yöntemi).
 
+## Aşama 22 — Takvim Gezinme ve Program Düzenleme ✅
+
+**Sorunlar (Zeynep'in geri bildirimi):**
+1. "Takvimde hafta veya ayları oklarla ilerleyerek görebilmek istiyorum" — Ana Sayfa'daki haftalık/aylık takvim ızgarası tek bir sabit pencereye (31 Ağustos - 30 Eylül 2026) kilitliydi, gezinme yoktu.
+2. "Uygulama üzerinden eklediğim takvim notunu silebilmeli ve düzenleyebilmeliyim" — silme zaten vardı, düzenleme yoktu.
+3. "Yaklaşan programlara tarih, not, link ekleyemiyorum, eklenen programı silemiyorum düzenleyemiyorum" — Ana Sayfa'nın hızlı program ekleme formu SADECE bir başlık alıyordu; yazılan "tarih" hiç ayrıştırılmıyordu (her zaman `TODAY`'e sabitleniyordu, sessiz bir hataydı), not/link alanı yoktu, silme hiçbir yerde yoktu.
+4. "Program Takvimi'nde düzenleyebiliyorum ama kaydet tuşu yok, kaydedip kaydetmediğimi nasıl anlayacağım" — not/link alanları `onBlur` ile sessizce kaydediyordu, görünür bir onay yoktu.
+
+### 1. Takvim ızgarası artık gerçek tarihlerle çalışıyor, oklarla gezilebiliyor ✅
+- [x] `dayNotes` anahtarları "ayın kaçı" (1-30, hep Eylül 2026 anlamına geliyordu) yerine tam `YYYY-MM-DD` oldu (`lib/dates.ts` → `toDateKey`/`parseDateKey`/`startOfWeek`/`addDays`/`addMonths`) — aksi halde farklı aylardaki aynı gün numarası (Eylül'ün 5'i / Ekim'in 5'i) çakışırdı.
+- [x] Eskiden ayrı bir `AUG31_BLOCKS` sabiti olarak özel işlenen 31 Ağustos, artık `SEED_DAY_NOTES`'un normal bir günü (`2026-08-31`) — özel durum kodu kalktı.
+- [x] Ana Sayfa'daki hafta/ay başlığının yanına ‹ › ok düğmeleri ve o anki dönemi gösteren bir etiket eklendi ("7 Eyl – 13 2026" / "Ekim 2026" gibi) — hafta görünümünde ±7 gün, ay görünümünde ±1 ay ilerliyor. Varsayılan başlangıç (1 Eylül 2026 çapa tarihi) eski sabit görünümle BİREBİR aynı, yani mevcut demo veriler hiç kaybolmadı/kaymadı.
+- [x] Google Calendar senkronizasyon penceresi (`GCAL_RANGE_START/END`) 2024-2029 arasına genişletildi — .ics zaten tek seferde tam metin çekilip yerelde tarihe göre filtrelendiği için (bkz. Aşama 9) bu EKSTRA bir ağ isteği gerektirmiyor, sadece gezinilen başka aylarda da gerçek Google Calendar etkinlikleri görünsün diye.
+- [x] Hafta görünümündeki gün başlıkları da artık (Ay görünümündeki hücreler gibi) tıklanabilir — o günün panelini açıyor (eskiden sadece Ay görünümünde vardı).
+- [x] **Migration:** Canlıda zaten eski numaralı anahtarlarla (`1`, `2`, ... `30`) kaydedilmiş gerçek gün notları olabilir — `normalizeLoadedState` bunları sessizce `2026-09-DD`'ye çeviriyor (`normalizeDayNotes()`, Aşama 18'deki `normalizeExtraPrograms` ile aynı desen). Gerçekçi sahte eski veriyle uçtan uca doğrulandı: numaralı anahtar (`"5"`) → `2026-09-05`'e taşındı, eski anahtar kalmadı.
+
+### 2. Gün notu düzenleme (DayPanel) ✅
+- [x] Her not satırına silme ikonunun yanına bir kalem (düzenle) ikonu eklendi — tıklanınca satır, saat + metin girişi olan bir düzenleme formuna dönüşüyor, "Kaydet"/"Vazgeç" ile onaylanıyor/iptal ediliyor. Yeni `app.editDayNote(dateKey, id, patch)` action'ı eklendi.
+- [x] Panel başlığı artık gerçek tarihi gösteriyor (`formatFullDateTR`, ör. "5 Ekim 2026") — eskiden hep sabit "Eylül 2026" yazıyordu.
+
+### 3. Yaklaşan Programlar: tarih/not/link ile ekleme + silme ✅
+- [x] Ana Sayfa'nın "+ Program ekle" formu artık 4 ayrı alan: Başlık, Tarih (`<input type="date">`), Not, Link — eskiden tek bir "Program adı ve tarih…" serbest metin alanıydı ve yazılan tarih HİÇ kullanılmıyordu (gerçek bir sessiz hataydı, her yeni program otomatik bugünün tarihine düşüyordu). Yeni `qProgramDate`/`qProgramNote`/`qProgramLink` state alanları eklendi.
+- [x] Her "eklediğim" (extra) yaklaşan program satırına bir silme ikonu eklendi — statik (seed) programlarda görünmüyor, sadece kullanıcının kendi eklediklerinde. Yeni `app.removeExtraProgram(id)` action'ı.
+
+### 4. Program Takvimi: başlık/tarih düzenleme + görünür "Kaydet" onayı + silme ✅
+- [x] Genişletilmiş program satırına (sadece "eklediğim" programlarda) Başlık ve Tarih editörleri eklendi — eskiden sadece Not/Link/Dosya düzenlenebiliyordu, başlık statik metindi.
+- [x] **`onBlur` ile sessiz kayıt kaldırıldı** — Not/Link/Başlık/Tarih artık bir taslak (`draft`) state'inde tutuluyor, tek bir görünür **"Kaydet"** butonuna basınca hepsi birden kaydediliyor ve yanında 2 saniyeliğine **"✓ Kaydedildi"** onayı beliriyor. Zeynep'in "kaydedip kaydetmediğimi nasıl anlayacağım" sorusuna doğrudan cevap.
+- [x] "Programı sil" bağlantısı eklendi (sadece extra programlarda) — Ana Sayfa'daki silme ile aynı `removeExtraProgram` action'ını kullanıyor, iki yerden de silinebiliyor.
+
+### Uçtan uca doğrulama
+Gerçek tarayıcı testleriyle doğrulandı: hafta oklarıyla ileri gidince etiket doğru değişiyor ("31 Ağu – 6 Eyl 2026" → "7 Eyl – 13 2026"); ay oklarıyla Eylül'den Ekim'e geçiliyor; Ekim'in 5'i açılınca panel "5 Ekim 2026" gösteriyor ve BOŞ geliyor (Eylül'ün eski verisi sızmıyor — migration'ın doğru çalıştığının kanıtı); bir gün notu eklenip kalemle düzenlenip silinebiliyor; Ana Sayfa'dan başlık+tarih+not+link ile eklenen bir program doğru sırada (gerçek günler kaldı hesabına göre) ve doğru bilgilerle görünüyor, oradan silinebiliyor; Program Takvimi'nde aynı programın başlığı/tarihi/notu/linki düzenlenip Kaydet'e basılınca "✓ Kaydedildi" görünüyor VE Redis'teki `/api/state` kaydı (`extraPrograms[].date` doğru `DD.MM.YYYY` formatında) doğrudan okunarak gerçekten kaydedildiği kanıtlandı; oradan da silinebiliyor. Testler, gerçek `app:state` anahtarına dokunmadan geçici bir test anahtarıyla yapıldı (bkz. Aşama 20/21'deki aynı yöntem); test sonrası gerçek anahtarın (zaten Zeynep'in gerçek kullanımıyla oluşmuş) etkilenmediği doğrulandı.
+
 ## Gelecek fikirleri (henüz plana alınmadı, sadece not)
 - Arka plan görselleri için otomatik/AI üretilen görsellere geçiş — Aşama 21'de bunun yerine sitenden doğrudan yükleme/silme (self-servis) tercih edildi, bu fikir hâlâ ayrı bir olasılık olarak (ör. hiç fotoğraf eklenmediğinde bir "varsayılan AI seti" gibi) not düşülüyor.
 - Anahtar kelimelerin kullanıcı içeriğinden otomatik çıkarılması (bkz. Aşama 11).

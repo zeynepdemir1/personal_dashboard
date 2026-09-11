@@ -69,6 +69,11 @@ fotoğraf (Cloudinary'de saklanır), ve alt görevlerden oluşan bir checklist.
 TÜBİTAK başvuruları, Teknofest son tarihleri gibi yaklaşan programların
 listesi — her birine not, link ve dosya (ör. şartname PDF'i) eklenebilir,
 kalan gün sayısı otomatik hesaplanır ve renkle (yakınsa kırmızı) vurgulanır.
+Ana Sayfa'dan eklenen ("eklediğim") programlar için başlık/tarih de
+buradan düzenlenebilir ve programın kendisi silinebilir; tüm düzenlemeler
+bir taslakta tutulup görünür bir **"Kaydet"** butonuyla onaylanıyor (basınca
+kısa süreliğine "✓ Kaydedildi" gösteriliyor) — sessiz, belirsiz bir
+otomatik kayıt yok.
 
 ### Şiir
 Yazılan şiirlerin listelendiği sade bir arşiv — ekleme/düzenleme/silme
@@ -99,11 +104,14 @@ bildirilir.
 
 ### Takvim (Ana Sayfa)
 Haftalık (saat bazlı, ders/etkinlik blokları) ve aylık (gün başına
-gösterge noktaları) iki görünümlü bir takvim. Google Calendar'daki gerçek
+gösterge noktaları) iki görünümlü bir takvim — başlığın yanındaki ‹ ›
+oklarıyla önceki/sonraki haftaya ya da aya gidilebilir (varsayılan görünüm
+hâlâ demo verinin bulunduğu 2026 Eylül'ü). Google Calendar'daki gerçek
 etkinlikler salt-okunur olarak senkronize edilir ve yerel notlardan
 görsel olarak ayrılır (bkz.
 [Google Calendar salt-okunur kararı](#mimari-karar-2-google-calendar-salt-okunur)).
-Bir güne tıklanınca not/ders eklenebilen bir detay paneli açılır.
+Bir güne tıklanınca not/ders eklenebilen, mevcut kayıtları düzenlenebilen
+(kalem ikonu) ve silinebilen (çöp kutusu ikonu) bir detay paneli açılır.
 
 ### Profil
 Sol menünün altındaki profil kartından ad/soyad ve bir profil fotoğrafı
