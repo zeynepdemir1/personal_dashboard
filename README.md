@@ -20,7 +20,7 @@ düşünülenler için **[PLAN.md](./PLAN.md)**'ye bakın — bu dosya projenin
 "neden"lerini, teknik kısıtlamaları ve aşama aşama alınan kararları
 belgeler.
 
-## Ekran görüntüleri
+## Görsel önizleme
 
 Canlı siteden (zdemir.tech, giriş yapıldıktan sonra), gerçek veriyle.
 
