@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../state/AppState';
 import { colors, fonts } from '../lib/theme';
 import { eventsOnDate } from '../lib/googleCalendar';
-import { formatFullDateTR, parseDateKey } from '../lib/dates';
+import { formatFullDateTR, parseDateKey, isoDateToDotDate } from '../lib/dates';
 
 function formatEventTime(ev: { start: Date; end: Date; allDay: boolean }): string {
   if (ev.allDay) return 'tüm gün';
@@ -17,10 +17,22 @@ export function DayPanel() {
   const [editLabel, setEditLabel] = useState('');
 
   if (app.dayPanel == null) return null;
+  const dayPanel = app.dayPanel;
 
-  const date = parseDateKey(app.dayPanel);
-  const items = app.dayNotes[app.dayPanel] || [];
+  const date = parseDateKey(dayPanel);
+  const items = app.dayNotes[dayPanel] || [];
   const gcalItems = eventsOnDate(app.gcalEvents, date.getFullYear(), date.getMonth(), date.getDate());
+  // Program Takvimi'ne eklenen programlar burada "canlı bağlı" olarak
+  // gösteriliyor — ayrı bir kopya değil, doğrudan app.extraPrograms'tan
+  // filtrelenmiş; program düzenlenince/silinince burada da otomatik
+  // güncellenir. Bu yüzden bilerek düzenlenemez/silinemez — kaynağı
+  // Program Takvimi, oraya yönlendiriliyor (bkz. PLAN.md Aşama 22 ek).
+  const programItems = app.extraPrograms.filter((p) => p.date === isoDateToDotDate(dayPanel));
+
+  const openInCalendar = () => {
+    app.closeDayPanel();
+    app.navigate('calendar');
+  };
 
   const startEdit = (id: string, time: string, label: string) => {
     setEditingId(id);
@@ -30,7 +42,7 @@ export function DayPanel() {
   const cancelEdit = () => setEditingId(null);
   const saveEdit = () => {
     if (!editingId || !editLabel.trim()) return;
-    app.editDayNote(app.dayPanel!, editingId, { time: editTime, label: editLabel.trim() });
+    app.editDayNote(dayPanel, editingId, { time: editTime, label: editLabel.trim() });
     setEditingId(null);
   };
 
@@ -157,7 +169,7 @@ export function DayPanel() {
                   </svg>
                 </span>
                 <span
-                  onClick={() => app.removeDayNote(app.dayPanel!, it.id)}
+                  onClick={() => app.removeDayNote(dayPanel, it.id)}
                   className="text-hover-red"
                   style={{ cursor: 'pointer', color: colors.placeholderText, padding: 4, flex: '0 0 auto' }}
                   title="Sil"
@@ -193,7 +205,34 @@ export function DayPanel() {
               </span>
             </div>
           ))}
-          {items.length === 0 && gcalItems.length === 0 && (
+          {programItems.map((p) => (
+            <div
+              key={`prog-${p.id}`}
+              onClick={openInCalendar}
+              className="hover-row-alt"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+                padding: '10px 12px',
+                border: `1px solid ${colors.borderStrong}`,
+                borderRadius: 4,
+                background: 'rgba(176,85,79,0.06)',
+                cursor: 'pointer',
+              }}
+              title="Program Takvimi'nde düzenle"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13.5, color: colors.ink, lineHeight: 1.4, flex: 1, fontWeight: 500 }}>{p.title}</span>
+                <span style={{ fontFamily: fonts.sans, fontSize: 9, letterSpacing: '0.04em', textTransform: 'uppercase', color: colors.rose, flex: '0 0 auto' }}>
+                  Program
+                </span>
+              </div>
+              {p.note && <span style={{ fontSize: 12, color: colors.inkSoft, lineHeight: 1.4 }}>{p.note}</span>}
+              <span style={{ fontSize: 10.5, color: colors.inkFainter }}>Program Takvimi'nde düzenle →</span>
+            </div>
+          ))}
+          {items.length === 0 && gcalItems.length === 0 && programItems.length === 0 && (
             <div style={{ fontSize: 13, color: colors.inkFaint, fontStyle: 'italic' }}>
               Bu güne henüz bir şey eklenmedi.
             </div>

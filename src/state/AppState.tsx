@@ -81,6 +81,7 @@ interface PersistedState {
   extraTopics: ExtraTopic[];
   extraProjects: ExtraProject[];
   extraPrograms: ExtraProgram[];
+  hiddenPrograms: string[];
   programAttachments: Record<string, ProgramAttachment>;
   learnEntries: LearnEntry[];
   extraGrowthNotes: GrowthNote[];
@@ -104,6 +105,7 @@ function defaultPersisted(): PersistedState {
     extraTopics: [],
     extraProjects: [],
     extraPrograms: [],
+    hiddenPrograms: [],
     programAttachments: {},
     learnEntries: [],
     extraGrowthNotes: [],
@@ -200,6 +202,7 @@ function normalizeLoadedState(parsed: unknown, mobile: boolean): PersistedState 
         : null,
     poemEntries: Array.isArray(p.poemEntries) ? (p.poemEntries as PoemX[]) : base.poemEntries,
     dayNotes: p.dayNotes ? normalizeDayNotes(p.dayNotes) : base.dayNotes,
+    hiddenPrograms: Array.isArray(p.hiddenPrograms) ? (p.hiddenPrograms as unknown[]).filter((x): x is string => typeof x === 'string') : base.hiddenPrograms,
     profileName: typeof p.profileName === 'string' && p.profileName.trim() ? p.profileName : base.profileName,
     profilePhoto: typeof p.profilePhoto === 'string' ? p.profilePhoto : null,
     backgroundImages:
@@ -290,6 +293,8 @@ export interface AppStateValue {
   updateExtraProgram: (id: string, patch: Partial<ExtraProgram>) => void;
   removeExtraProgramFile: (id: string) => void;
   removeExtraProgram: (id: string) => void;
+  hiddenPrograms: string[];
+  hideStaticProgram: (title: string) => void;
 
   qLink: string;
   setQLink: (v: string) => void;
@@ -904,6 +909,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       },
       removeExtraProgram: (id: string) => {
         patch({ extraPrograms: persistedRef.current.extraPrograms.filter((x) => x.id !== id) });
+      },
+      hiddenPrograms: persisted.hiddenPrograms,
+      hideStaticProgram: (title: string) => {
+        if (persistedRef.current.hiddenPrograms.includes(title)) return;
+        patch({ hiddenPrograms: [...persistedRef.current.hiddenPrograms, title] });
       },
 
       qLink,

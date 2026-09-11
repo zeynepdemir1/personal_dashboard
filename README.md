@@ -73,7 +73,13 @@ Ana Sayfa'dan eklenen ("eklediğim") programlar için başlık/tarih de
 buradan düzenlenebilir ve programın kendisi silinebilir; tüm düzenlemeler
 bir taslakta tutulup görünür bir **"Kaydet"** butonuyla onaylanıyor (basınca
 kısa süreliğine "✓ Kaydedildi" gösteriliyor) — sessiz, belirsiz bir
-otomatik kayıt yok.
+otomatik kayıt yok. Baştan gelen örnek (seed) programlar da "Programı sil"
+ile görünümden kaldırılabilir (kod içindeki listeden silinmiyor, sadece
+senin görünümünden gizleniyor). Eklediğin bir program, Ana Sayfa'daki
+gün/hafta/ay takviminde de aynı tarihte otomatik görünür — ayrı bir kopya
+değil, canlı bağlı: programı düzenleyince/silince takvimdeki görünüm de
+anında değişir; takvimden ayrıca düzenlenemez/silinemez (kaynağı hep
+Program Takvimi'dir).
 
 ### Şiir
 Yazılan şiirlerin listelendiği sade bir arşiv — ekleme/düzenleme/silme

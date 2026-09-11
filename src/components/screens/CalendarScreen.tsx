@@ -44,7 +44,7 @@ export function CalendarScreen() {
     ? { display: 'flex', flexDirection: 'column', gap: 6, padding: '18px 6px', borderBottom: '1px solid #F1E4E4' }
     : { display: 'grid', gridTemplateColumns: '110px minmax(0, 1fr) 140px', gap: 20, padding: '20px 6px', borderBottom: '1px solid #F1E4E4', alignItems: 'baseline' };
 
-  const staticPrograms: DisplayProgram[] = PROGRAMS.map((p) => {
+  const staticPrograms: DisplayProgram[] = PROGRAMS.filter((p) => !app.hiddenPrograms.includes(p.title)).map((p) => {
     const att = app.programAttachments[p.title];
     return {
       key: `static:${p.title}`,
@@ -63,7 +63,7 @@ export function CalendarScreen() {
     key: `extra:${p.id}`,
     date: p.date,
     title: p.title,
-    baseNote: 'Ana sayfadan eklendi',
+    baseNote: p.note || 'Ana sayfadan eklendi',
     note: p.note,
     link: p.link,
     fileName: p.fileName,
@@ -113,7 +113,8 @@ export function CalendarScreen() {
   };
 
   const removeProgram = (p: DisplayProgram) => {
-    app.removeExtraProgram(p.key.slice(6));
+    if (p.key.startsWith('extra:')) app.removeExtraProgram(p.key.slice(6));
+    else app.hideStaticProgram(p.title);
     setExpanded(null);
     setDraft(null);
   };
@@ -177,9 +178,9 @@ export function CalendarScreen() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   <span style={{ fontFamily: fonts.serif, fontSize: 19, color: colors.ink }}>{p.title}</span>
                   <span style={{ fontSize: 13, lineHeight: 1.6, color: colors.inkSoft }}>{p.baseNote}</span>
-                  {(p.note || p.link || p.fileName) && (
+                  {((!isExtra && p.note) || p.link || p.fileName) && (
                     <span style={{ fontSize: 11, color: colors.rose }}>
-                      {[p.note && '📝 not', p.link && '🔗 link', p.fileName && '📎 dosya'].filter(Boolean).join(' · ')}
+                      {[!isExtra && p.note && '📝 not', p.link && '🔗 link', p.fileName && '📎 dosya'].filter(Boolean).join(' · ')}
                     </span>
                   )}
                 </div>
@@ -274,15 +275,14 @@ export function CalendarScreen() {
                     {saved && (
                       <span style={{ fontSize: 12, color: '#6E9E7E', fontWeight: 500 }}>✓ Kaydedildi</span>
                     )}
-                    {isExtra && (
-                      <span
-                        onClick={() => removeProgram(p)}
-                        className="text-hover-red"
-                        style={{ cursor: 'pointer', fontSize: 12, color: colors.placeholderText, marginLeft: 'auto' }}
-                      >
-                        Programı sil
-                      </span>
-                    )}
+                    <span
+                      onClick={() => removeProgram(p)}
+                      className="text-hover-red"
+                      style={{ cursor: 'pointer', fontSize: 12, color: colors.placeholderText, marginLeft: 'auto' }}
+                      title={isExtra ? undefined : 'Sabit örnek programlardan — sadece senin görünümünden kaldırılır'}
+                    >
+                      Programı sil
+                    </span>
                   </div>
                 </div>
               )}

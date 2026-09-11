@@ -16,6 +16,7 @@ import {
   addDays,
   addMonths,
   referenceToday,
+  isoDateToDotDate,
 } from '../../lib/dates';
 import { SEED_LEARN_ENTRIES } from '../../lib/learn';
 import { eventsOnDate } from '../../lib/googleCalendar';
@@ -95,7 +96,7 @@ export function Home() {
   // `id` sadece "eklediğim" (extra) programlarda var — Ana Sayfa'daki
   // silme ikonu bu yüzden sadece onlarda görünüyor, seed veride değil.
   const allPrograms = [
-    ...PROGRAMS.map((p) => ({ date: p.date, title: p.title, note: p.note, id: undefined as string | undefined })),
+    ...PROGRAMS.filter((p) => !app.hiddenPrograms.includes(p.title)).map((p) => ({ date: p.date, title: p.title, note: p.note, id: undefined as string | undefined })),
     ...app.extraPrograms.map((p) => ({ date: p.date, title: p.title, note: p.note || 'Ana sayfadan eklendi', id: p.id as string | undefined })),
   ];
   const upcoming = allPrograms
@@ -268,20 +269,18 @@ export function Home() {
                 <div style={{ fontSize: 12, color: colors.inkSoft, lineHeight: 1.5 }}>{u.note}</div>
                 <div style={{ fontFamily: fonts.sans, fontSize: 10, color: u.color, letterSpacing: '0.06em' }}>{u.left}</div>
               </div>
-              {u.id && (
-                <span
-                  onClick={() => app.removeExtraProgram(u.id!)}
-                  className="text-hover-red"
-                  title="Programı sil"
-                  style={{ cursor: 'pointer', color: colors.placeholderText, padding: 4, flex: '0 0 auto' }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M3 6h18" />
-                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                  </svg>
-                </span>
-              )}
+              <span
+                onClick={() => (u.id ? app.removeExtraProgram(u.id) : app.hideStaticProgram(u.title))}
+                className="text-hover-red"
+                title="Programı sil"
+                style={{ cursor: 'pointer', color: colors.placeholderText, padding: 4, flex: '0 0 auto' }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 6h18" />
+                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                </svg>
+              </span>
             </div>
           ))}
 
@@ -726,7 +725,12 @@ function MonthView({ anchorDate }: { anchorDate: Date }) {
     const dayNum = i - offset + 1;
     const valid = dayNum >= 1 && dayNum <= daysInMonth;
     const dateKey = valid ? toDateKey(new Date(year, month, dayNum)) : '';
-    const localCount = valid ? (app.dayNotes[dateKey] || []).length : 0;
+    // Program Takvimi'ne eklenen programlar (extraPrograms), o güne
+    // "canlı bağlı" olarak (ayrı bir kopya notu olmadan) gün notu sayısına
+    // dahil ediliyor — Zeynep'in isteği: program eklendiğinde/düzenlendiğinde/
+    // silindiğinde takvimdeki görünüm otomatik güncellensin (bkz. PLAN.md).
+    const programCount = valid ? app.extraPrograms.filter((p) => p.date === isoDateToDotDate(dateKey)).length : 0;
+    const localCount = valid ? (app.dayNotes[dateKey] || []).length + programCount : 0;
     const gcalCount = valid ? eventsOnDate(app.gcalEvents, year, month, dayNum).length : 0;
     return {
       day: valid ? dayNum : '',
