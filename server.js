@@ -456,6 +456,33 @@ function daysLeftReal(dateStr) {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
 
+// Program Keşfi (bkz. PLAN.md Aşama 22 ek) — Ollama'nın "son başvuru
+// tarihi" çıkarımı (analyzeDiscoveredProgram) küçük bir modelle (8B)
+// güvenilmez çıktı; birçok gerçek sonuçta (ör. "TÜBİTAK 2209-A ... 13
+// Ekim 2025 ve 12 Kasım 2025 tarihleri arasında") tarih hiç çıkarılamadı,
+// bu yüzden geçmiş/bitmiş sonuçlar deadline=null olarak süresiz gösterildi.
+// Ollama'ya "güncel mi geçmiş mi" diye sorup daha karmaşık bir 4. satır
+// eklemek de denendi — model bu bileşik yargıda tutarsız çıktı (aynı
+// örnek farklı çalıştırmalarda EVET/GÜNCEL ↔ HAYIR/GEÇMİŞ arası savruldu,
+// hatta gerçekten güncel bir örneği yanlışlıkla "geçmiş" işaretledi).
+// Bunun yerine BASİT VE DETERMİNİSTİK bir ikinci sinyal kullanılıyor:
+// başlık+snippet'te geçen en YÜKSEK yıl (20xx) bugünün yılından KÜÇÜKSE,
+// metindeki HER tarih referansı geçmişte demektir — sonuç muhtemelen
+// bitmiş/geçmiş bir döneme ait. Gerçek verideki 111 "tarihsiz ama
+// alakalı" sonuç üzerinde denendi: 21'i doğru şekilde geçmiş olarak
+// yakalandı (TEKNOFEST2024, "2209-A ... 2025" gibi), hiçbiri (yıl
+// belirtilmeyen veya güncel/gelecek yıl içeren) yanlışlıkla elenmedi.
+const YEAR_RE = /(?<!\d)(20\d{2})(?!\d)/g;
+function maxMentionedYear(text) {
+  const matches = String(text || '').match(YEAR_RE);
+  if (!matches) return null;
+  return Math.max(...matches.map(Number));
+}
+function isStaleByYear(item) {
+  const y = maxMentionedYear(`${item.title || ''} ${item.snippet || ''}`);
+  return y !== null && y < new Date().getFullYear();
+}
+
 function buildDailyMessage() {
   const upcoming = UPCOMING_PROGRAMS.map((p) => ({ ...p, left: daysLeftReal(p.date) }))
     .filter((p) => p.left >= 0)
@@ -687,10 +714,12 @@ app.get('/api/discover/relevant', async (_req, res) => {
     // Son başvuru tarihi geçmiş sonuçlar burada elenir (bkz. PLAN.md
     // Aşama 19 madde 2) — böylece sayfa/widget her zaman güncel kalır,
     // ayrı bir temizleme işi/cron'a gerek yok. Tarihi bilinmeyen (deadline
-    // null) sonuçlar süresiz gösterilmeye devam eder.
+    // null) sonuçlar, metinde geçen en yeni yıl bugünün yılından eskiyse
+    // (bkz. isStaleByYear, Aşama 22 ek) yine elenir; hiç yıl geçmiyorsa
+    // (gerçekten süresiz/rutin bir program olabilir) gösterilmeye devam eder.
     const relevant = items
       .filter((it) => it.status === 'relevant' && !it.dismissed)
-      .filter((it) => !it.deadline || daysLeftReal(it.deadline) >= 0)
+      .filter((it) => (it.deadline ? daysLeftReal(it.deadline) >= 0 : !isStaleByYear(it)))
       .sort((a, b) => (a.foundAt < b.foundAt ? 1 : -1));
     res.json({ items: relevant });
   } catch (err) {
@@ -749,7 +778,10 @@ app.post('/api/discover/mark-filtered', express.json({ limit: '1mb' }), async (r
       item.deadline = typeof deadline === 'string' ? deadline : null;
       item.description = typeof description === 'string' ? description : null;
       await redis('HSET', 'discover:items', id, JSON.stringify(item));
-      if (relevant) toNotify.push(item);
+      // /api/discover/relevant'ta zaten elenecek (bkz. isStaleByYear)
+      // geçmiş bir sonuç için Telegram bildirimi göndermenin anlamı yok.
+      const stale = item.deadline ? daysLeftReal(item.deadline) < 0 : isStaleByYear(item);
+      if (relevant && !stale) toNotify.push(item);
     }
     if (toNotify.length > 0 && TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
       // Telegram mesaj başına ~4096 karaktere izin veriyor — normal

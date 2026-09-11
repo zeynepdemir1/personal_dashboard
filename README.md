@@ -100,7 +100,11 @@ saklanır ve daha önce görülenler tekrar gösterilmez. Profil filtresi
 inşaat — eleme), aynı zamanda son başvuru tarihi ve kısa bir açıklama
 çıkarımı, tarama anında değil, **uygulama Ollama'nın erişilebilir olduğu
 bir cihazda açıldığında** yerel modelle yapılır. Süresi geçmiş sonuçlar
-otomatik olarak elenir. Sol menüdeki kendi sayfasında kategoriye
+otomatik olarak elenir — açık bir son başvuru tarihi varsa ona bakılır;
+yoksa (Ollama küçük bir modelle her zaman tarih çıkaramadığı için, bkz.
+PLAN.md Aşama 23) metinde geçen en yeni yıl bugünün yılından eskiyse
+sonuç yine de geçmiş kabul edilip gösterilmez. Sol menüdeki kendi
+sayfasında kategoriye
 (hackathon/TÜBİTAK/Teknofest/staj) göre gruplanmış olarak, Ana Sayfa'da
 ise tarihe göre sıralı, dörderli bir carousel olarak gösterilir. Her
 sonucun yanında bir "Takip et" aksiyonu var — tıklanınca o sonuç, elle
