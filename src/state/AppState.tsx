@@ -8,7 +8,7 @@ import {
   type DayNote,
   type GrowthNote,
 } from '../lib/data';
-import { makeLearnEntry, type LearnEntry } from '../lib/learn';
+import { makeLearnEntry, stripHtml, type LearnEntry } from '../lib/learn';
 import { deriveTitleFromUrl } from '../lib/url';
 import { fetchGoogleCalendarEvents, type GCalEvent, type GCalSyncStatus } from '../lib/googleCalendar';
 import { analyzeDiscoveredProgram, pingOllama, summarizeLearnEntry } from '../lib/ollama';
@@ -331,11 +331,9 @@ export interface AppStateValue {
   addingLearnEntry: boolean;
   qLearnTitle: string;
   setQLearnTitle: (v: string) => void;
-  qLearnBody: string;
-  setQLearnBody: (v: string) => void;
   startAddLearnEntry: () => void;
   cancelAddLearnEntry: () => void;
-  saveLearnEntry: () => void;
+  saveLearnEntry: (bodyHtml: string) => void;
 
   topicOverrides: Record<number, TopicOverride>;
   toggleTopicAt: (i: number) => void;
@@ -643,7 +641,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [qProject, setQProject] = useState('');
   const [addingLearnEntry, setAddingLearnEntry] = useState(false);
   const [qLearnTitle, setQLearnTitle] = useState('');
-  const [qLearnBody, setQLearnBody] = useState('');
   const [dayPanel, setDayPanel] = useState<string | null>(null);
   const [dayPanelInput, setDayPanelInput] = useState('');
   const [dayPanelTime, setDayPanelTime] = useState('');
@@ -1191,30 +1188,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       addingLearnEntry,
       qLearnTitle,
       setQLearnTitle,
-      qLearnBody,
-      setQLearnBody,
       startAddLearnEntry: () => setAddingLearnEntry(true),
       cancelAddLearnEntry: () => {
         setAddingLearnEntry(false);
         setQLearnTitle('');
-        setQLearnBody('');
       },
-      saveLearnEntry: () => {
+      saveLearnEntry: (bodyHtml: string) => {
         const title = qLearnTitle.trim();
-        const body = qLearnBody.trim();
-        if (!title || !body) return;
-        const entry = makeLearnEntry(title, body);
+        if (!title || !stripHtml(bodyHtml)) return;
+        const entry = makeLearnEntry(title, bodyHtml);
         patch({ learnEntries: [entry, ...persistedRef.current.learnEntries] });
         setQLearnTitle('');
-        setQLearnBody('');
         setAddingLearnEntry(false);
         navigate('learn', 0);
 
         // Arka planda yerel modelle özetle (PLAN.md Aşama 10) — başarısız
         // olursa sessizce vazgeç, giriş özet olmadan kalır. Hazır olunca
         // hem girişin kendi özetini doldur hem de Akademik Gelişim'in bu
-        // ayki not listesine gerçek bir kayıt olarak ekle.
-        summarizeLearnEntry(title, body).then((summary) => {
+        // ayki not listesine gerçek bir kayıt olarak ekle. Ollama'ya HTML
+        // değil, çıkarılmış düz metin (entry.body) gönderiliyor.
+        summarizeLearnEntry(title, entry.body.join('\n\n')).then((summary) => {
           if (!summary) return;
           recordLearnSummary(entry.id, title, summary);
         });
@@ -1332,7 +1325,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       qProject,
       addingLearnEntry,
       qLearnTitle,
-      qLearnBody,
       dayPanel,
       dayPanelInput,
       dayPanelTime,

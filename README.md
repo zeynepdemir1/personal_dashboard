@@ -42,7 +42,9 @@ tam not listesi. "Bir Şey Öğrendim" girişlerinden yerel AI ile üretilen
 ekleniyor.
 
 ### Bir Şey Öğrendim
-Serbest metin günlük türü öğrenme girişleri (başlık + gövde metni).
+Serbest metin günlük türü öğrenme girişleri (başlık + gövde metni) —
+kalın/italik/liste biçimlendirmesi ve gömülü resim (Cloudinary'de
+saklanır) destekli basit bir zengin metin editörüyle yazılır.
 Kaydedilince arka planda Ollama'ya gönderiliyor, tek cümlelik bir özet
 üretiliyor ve bu özet hem girişin kendi sayfasında hem Akademik Gelişim'de
 gösteriliyor. Ollama o an erişilemezse giriş "özetlenmedi" durumunda kalır

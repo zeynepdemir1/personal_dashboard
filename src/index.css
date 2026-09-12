@@ -120,3 +120,37 @@ textarea {
 .nav-hover:hover {
   background: var(--color-nav-hover) !important;
 }
+
+/* PLAN.md Aşama 24: "Bir Şey Öğrendim" zengin metin girişi/gösterimi —
+   contentEditable placeholder'ı (native `placeholder` attribute'u yok,
+   :empty:before ile taklit ediliyor) ve kaydedilmiş HTML içeriğin
+   (bold/italic/liste/resim) diğer paragraflarla aynı tipografiyle
+   gösterilmesi için. */
+.learn-editor:empty:before {
+  content: attr(data-placeholder);
+  color: var(--color-ink-faint);
+  pointer-events: none;
+}
+.learn-rich-content {
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 17.5px;
+  line-height: 1.72;
+  color: var(--color-ink);
+}
+.learn-rich-content div,
+.learn-rich-content p {
+  margin: 0 0 18px;
+}
+.learn-rich-content ul {
+  margin: 0 0 18px;
+  padding-left: 1.4em;
+}
+.learn-rich-content li {
+  margin-bottom: 6px;
+}
+.learn-rich-content img {
+  max-width: 100%;
+  border-radius: 4px;
+  margin: 6px 0 18px;
+  display: block;
+}

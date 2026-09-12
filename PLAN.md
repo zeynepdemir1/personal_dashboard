@@ -394,6 +394,19 @@ Gerçek tarayıcı testleriyle doğrulandı: hafta oklarıyla ileri gidince etik
 - [x] Aynı kontrol, `mark-filtered`'daki Telegram bildirimi göndermeden ÖNCE de uygulandı — zaten `/relevant`'ta elenecek bayat bir sonuç için bildirim gitmesin diye.
 - [x] **Gerçek veriyle doğrulandı** (yazmadan, sadece okuyarak önce simüle edildi, sonra kodla tekrar doğrulandı): 111 tarihsiz "relevant" sonuçtan 21'i doğru şekilde geçmiş olarak yakalandı (ör. "T3 AI Hackathon ... TEKNOFEST2024", "TÜBİTAK 2209-A ... 2025" gibi), hiçbiri (yıl belirtilmeyen veya 2026+ içeren) yanlışlıkla elenmedi. Canlı sunucuya karşı gerçek `/api/discover/relevant` çağrısı yapılıp sonuç sayısının 111'den 90'a düştüğü VE bilinen bayat bir örneğin artık listede olmadığı doğrulandı — bu değişiklik salt-okunur bir filtre olduğu için mevcut veriye hiçbir yazma/geçiş işlemi gerekmedi, deploy edilince hemen etkili olacak.
 
+## Aşama 24 — Bir Şey Öğrendim: Zengin Metin + Resim ✅
+
+**İstek (Zeynep):** "Bir şey öğrendim bölümüne metin girişi yaparken resim eklenebilsin, ayrıca yazım stili seçenekleri de eklensin." Netleştirme sorularına cevap: resimler **Cloudinary**'de saklansın (rest of app ile tutarlı), stil olarak **kalın, italik, liste** yeterli.
+
+- [x] Yeni giriş formundaki düz `<textarea>`, küçük bir araç çubuğu (K / İ / • Liste / 🖼 Görsel ekle) + `contentEditable` bir `<div>` ile değiştirildi (`Learn.tsx`). `document.execCommand('bold'/'italic'/'insertUnorderedList')` kullanılıyor — ayrı bir zengin metin editörü kütüphanesi eklemek bu projenin bağımlılıksız tarzına aykırı olurdu, üç basit komut için gerek yok.
+- [x] Resim ekleme, PROFİL/proje fotoğraflarıyla AYNI altyapıyı kullanıyor (`compressImage` → `uploadImage` → Cloudinary) — dosya seçilince imleç konumuna `<img>` olarak gömülüyor (`execCommand('insertImage')`). Dosya seçme diyaloğu odağı çaldığı için, tıklama anındaki metin seçimi (`Range`) önceden kaydedilip yükleme bitince geri yükleniyor — aksi halde resim imlecin olduğu yere değil, editörün sonuna düşerdi.
+- [x] Panodan yapıştırma (`onPaste`) düz metne indirgeniyor — başka bir siteden kopyalanan HTML'i (script/olay işleyicisi riski, tutarsız stil) hiç kabul etmiyor.
+- [x] **Veri modeli:** `LearnEntry`'e `bodyHtml?: string` eklendi — SADECE kullanıcının kendi yeni girişlerinde dolu, seed/tasarım girişlerinde yok (onlar hâlâ eski `body: string[]` düz paragraf yoluyla gösteriliyor, dokunulmadı). Yeni `stripHtml()` yardımcı fonksiyonu (`lib/learn.ts`) HTML'den düz metin çıkarıyor (blok elemanları arasına gerçek satır sonu koyarak) — kelime sayısı/okuma süresi tahmini, teaser VE Ollama özetleme girdisi hep bu düz metinden türetiliyor, HTML etiketleri hiçbir zaman Ollama'ya ya da sayaçlara karışmıyor.
+- [x] Gösterim tarafında (`article.bodyHtml` varsa) içerik `dangerouslySetInnerHTML` ile, diğer paragraflarla aynı tipografiyi veren yeni bir `.learn-rich-content` CSS sınıfıyla (`index.css`) render ediliyor.
+
+### Uçtan uca doğrulama
+Gerçek tarayıcı testiyle: kalın+italik+liste biçimlendirmesi uygulanıp bir gerçek görsel yüklendi → editördeki HTML'de `<b>`/`<i>`/`<ul><li>`/gerçek bir Cloudinary `<img>` URL'i doğrulandı → Kaydet'e basılıp render edilen girişte AYNI biçimlendirme + görsel doğru göründü → Redis'teki `/api/state` kaydı doğrudan okunarak `bodyHtml`'in gerçek Cloudinary URL'ini içerdiği, buna karşın `body` (özetleme/sayaç için kullanılan düz metin alanı) içinde HİÇBİR HTML etiketi kalmadığı doğrulandı.
+
 ## Gelecek fikirleri (henüz plana alınmadı, sadece not)
 - Arka plan görselleri için otomatik/AI üretilen görsellere geçiş — Aşama 21'de bunun yerine sitenden doğrudan yükleme/silme (self-servis) tercih edildi, bu fikir hâlâ ayrı bir olasılık olarak (ör. hiç fotoğraf eklenmediğinde bir "varsayılan AI seti" gibi) not düşülüyor.
 - Anahtar kelimelerin kullanıcı içeriğinden otomatik çıkarılması (bkz. Aşama 11).

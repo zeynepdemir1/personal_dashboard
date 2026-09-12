@@ -16,6 +16,14 @@ export interface LearnEntry {
   stamp: string;
   summary?: string;
   body: string[];
+  // PLAN.md Aşama 24: kullanıcının kendi eklediği girişler artık zengin
+  // metin (kalın/italik/liste + gömülü resim) destekliyor — bu HTML,
+  // Learn.tsx'te dangerouslySetInnerHTML ile gösteriliyor. Sadece
+  // KULLANICININ KENDİ contentEditable girişinden geliyor (execCommand
+  // ile üretiliyor, paste düz metne indirgeniyor — bkz. Learn.tsx), bu
+  // yüzden script/olay işleyicisi riski yok. Seed/tasarım girişlerinde
+  // yok — onlar hâlâ `body` dizisiyle (düz paragraf) gösteriliyor.
+  bodyHtml?: string;
   code?: string;
   body2?: string[];
   tags: string[];
@@ -94,15 +102,29 @@ export function findLearnEntryIndexForTopic(topicTitle: string, learnEntries: Le
   return learnEntries.findIndex((e) => e.title === mappedTitle);
 }
 
-export function makeLearnEntry(title: string, bodyText: string): LearnEntry {
-  const words = bodyText.trim().split(/\s+/).filter(Boolean).length;
+// Zengin metin içeriğinden (HTML) düz metin çıkarır — kelime sayısı/okuma
+// süresi tahmini, teaser ve Ollama özetleme girdisi için (Ollama'ya HTML
+// etiketleriyle karışık bir metin göndermek yanlış kelime sayımına ve
+// gürültülü özetlere yol açardı). Blok elemanlarının (div/p/li/br)
+// aralarına gerçek satır sonu koyuyoruz — contentEditable'ın ürettiği
+// `<div>satır</div><div>satır</div>` yapısı aksi halde tek bir bitişik
+// metne dönüşürdü.
+export function stripHtml(html: string): string {
+  const withBreaks = html.replace(/<\/(div|p|li)>/gi, '$&\n').replace(/<br\s*\/?>/gi, '\n');
+  const el = document.createElement('div');
+  el.innerHTML = withBreaks;
+  return (el.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+export function makeLearnEntry(title: string, bodyHtml: string): LearnEntry {
+  const plainText = stripHtml(bodyHtml);
+  const words = plainText.split(/\s+/).filter(Boolean).length;
   const minutes = Math.max(1, Math.round(words / 180));
-  const paragraphs = bodyText
-    .trim()
+  const paragraphs = plainText
     .split(/\n{2,}/)
     .map((p) => p.trim())
     .filter(Boolean);
-  const body = paragraphs.length ? paragraphs : [bodyText.trim()];
+  const body = paragraphs.length ? paragraphs : [plainText];
   const teaser = body[0].length > 200 ? `${body[0].slice(0, 197)}…` : body[0];
 
   return {
@@ -116,6 +138,7 @@ export function makeLearnEntry(title: string, bodyText: string): LearnEntry {
     // gerçek bir özet üretene kadar bu alan boş kalıyor; body[0]'ı "özet"
     // diye tekrar göstermek yanıltıcı olurdu.
     body,
+    bodyHtml,
     tags: [],
     rel: `Bağlantılı: Akademik Gelişim · ${MONTHS[0]?.name.split(' ')[0] ?? ''}`,
     relScreen: 'growth',

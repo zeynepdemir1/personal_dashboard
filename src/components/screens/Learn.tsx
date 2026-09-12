@@ -1,12 +1,78 @@
-import type { CSSProperties } from 'react';
+import { useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useApp } from '../../state/AppState';
 import { colors, fonts } from '../../lib/theme';
 import { SEED_LEARN_ENTRIES } from '../../lib/learn';
+import { compressImage } from '../../lib/image';
+import { uploadImage } from '../../lib/upload';
 
 export function Learn() {
   const app = useApp();
   const narrow = app.width < 1180;
   const tight = app.width < 860;
+
+  // PLAN.md Aşama 24: "Bir Şey Öğrendim" girişlerine kalın/italik/liste
+  // biçimlendirmesi ve gömülü resim (Cloudinary) eklendi. `document.
+  // execCommand` deprecated ama tüm masaüstü/mobil Chromium'da (ve bu
+  // tarayıcı-bazlı, tek-kullanıcılı iç araç bağlamında) hâlâ güvenilir
+  // çalışıyor — üç basit komut (bold/italic/insertUnorderedList) + resim
+  // eklemek için ayrı bir zengin metin editörü kütüphanesi eklemek bu
+  // projenin "sade, bağımlılıksız" tarzına aykırı olurdu. İçerik
+  // kaydedilene kadar sadece DOM'da (editorRef) tutuluyor — React state'i
+  // her tuşta güncellemek contentEditable'da imleç sıçramasına yol açar.
+  const editorRef = useRef<HTMLDivElement>(null);
+  const savedRangeRef = useRef<Range | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  const exec = (command: string) => {
+    editorRef.current?.focus();
+    document.execCommand(command);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    // Panodan gelen HTML'i (başka bir siteden kopyalanmış olabilir) hiç
+    // kabul etmiyoruz — sadece düz metin olarak yapıştırıyoruz. Hem
+    // güvenlik (script/olay işleyicisi riski yok) hem tutarlı görünüm
+    // (yapıştırılan içerik kaynak sitenin fontunu/rengini getirmiyor).
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    document.execCommand('insertText', false, text);
+  };
+
+  const openImagePicker = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+      savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+    }
+    imageInputRef.current?.click();
+  };
+
+  const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImageError(null);
+    setUploadingImage(true);
+    try {
+      const url = await uploadImage(await compressImage(file));
+      editorRef.current?.focus();
+      const sel = window.getSelection();
+      if (sel && savedRangeRef.current) {
+        sel.removeAllRanges();
+        sel.addRange(savedRangeRef.current);
+      }
+      document.execCommand('insertImage', false, url);
+    } catch {
+      setImageError('Görsel yüklenemedi, tekrar dene.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleSave = () => {
+    app.saveLearnEntry(editorRef.current?.innerHTML || '');
+  };
 
   const entries = [...app.learnEntries, ...SEED_LEARN_ENTRIES];
   const activeIndex = Math.min(app.entry ?? 0, entries.length - 1);
@@ -24,6 +90,16 @@ export function Learn() {
     flexDirection: 'column',
     gap: 26,
     minWidth: 0,
+  };
+
+  const toolbarBtn: CSSProperties = {
+    padding: '6px 11px',
+    border: `1px solid ${colors.borderStrong}`,
+    borderRadius: 3,
+    fontSize: 12.5,
+    color: colors.inkSoft,
+    cursor: 'pointer',
+    background: colors.panel,
   };
 
   return (
@@ -70,10 +146,31 @@ export function Learn() {
               borderRadius: 3,
             }}
           />
-          <textarea
-            value={app.qLearnBody}
-            onChange={(e) => app.setQLearnBody(e.target.value)}
-            placeholder="Ne öğrendin? Serbestçe yaz…"
+
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div onClick={() => exec('bold')} className="btn-outline-hover" style={{ ...toolbarBtn, fontWeight: 700 }}>
+              K
+            </div>
+            <div onClick={() => exec('italic')} className="btn-outline-hover" style={{ ...toolbarBtn, fontStyle: 'italic' }}>
+              İ
+            </div>
+            <div onClick={() => exec('insertUnorderedList')} className="btn-outline-hover" style={toolbarBtn}>
+              • Liste
+            </div>
+            <div onClick={openImagePicker} className="btn-outline-hover" style={toolbarBtn}>
+              {uploadingImage ? 'yükleniyor…' : '🖼 Görsel ekle'}
+            </div>
+            <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={handleImageChange} />
+          </div>
+          {imageError && <span style={{ fontSize: 11, color: '#B0554F' }}>{imageError}</span>}
+
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onPaste={handlePaste}
+            data-placeholder="Ne öğrendin? Serbestçe yaz…"
+            className="learn-editor"
             style={{
               minHeight: 160,
               padding: '10px 12px',
@@ -85,9 +182,10 @@ export function Learn() {
               color: colors.ink,
               outline: 'none',
               borderRadius: 3,
-              resize: 'vertical',
+              overflowY: 'auto',
             }}
           />
+
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <div
               onClick={app.cancelAddLearnEntry}
@@ -103,11 +201,7 @@ export function Learn() {
             >
               Vazgeç
             </div>
-            <div
-              onClick={app.saveLearnEntry}
-              className="btn-dark"
-              style={{ padding: '9px 16px', fontSize: 13, cursor: 'pointer', borderRadius: 3 }}
-            >
+            <div onClick={handleSave} className="btn-dark" style={{ padding: '9px 16px', fontSize: 13, cursor: 'pointer', borderRadius: 3 }}>
               Kaydet
             </div>
           </div>
@@ -171,11 +265,15 @@ export function Learn() {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18, maxWidth: '68ch' }}>
-            {article.body.map((p, i) => (
-              <p key={i} style={{ margin: 0, fontFamily: fonts.serif, fontSize: 17.5, lineHeight: 1.72, color: colors.ink, textWrap: 'pretty' }}>
-                {p}
-              </p>
-            ))}
+            {article.bodyHtml ? (
+              <div className="learn-rich-content" dangerouslySetInnerHTML={{ __html: article.bodyHtml }} />
+            ) : (
+              article.body.map((p, i) => (
+                <p key={i} style={{ margin: 0, fontFamily: fonts.serif, fontSize: 17.5, lineHeight: 1.72, color: colors.ink, textWrap: 'pretty' }}>
+                  {p}
+                </p>
+              ))
+            )}
             {article.code && (
               <div style={{ border: `1px solid ${colors.borderStrong}`, background: colors.panelAlt, padding: '18px 20px', fontFamily: fonts.sans, fontSize: 12.5, lineHeight: 1.7, color: '#4A3B3E', whiteSpace: 'pre-wrap' }}>
                 {article.code}
