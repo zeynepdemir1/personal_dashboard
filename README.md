@@ -192,16 +192,46 @@ uygulama daha sonra Ollama'nın erişilebilir olduğu bilgisayardan açıldığ�
 bekleyen tüm içerik arka planda otomatik olarak işlenir. Kullanıcıya hiçbir
 hata gösterilmez — bu davranış tamamen sessiz ve beklenen bir durumdur.
 
-**Ollama CORS ayarı (bkz. PLAN.md Aşama 25 madde 5):** tarayıcı, gerçek
-siteyi (zdemir.tech) kullanırken bile Ollama'ya Render üzerinden değil
-DOĞRUDAN (`http://localhost:11434`) bağlanıyor — Render'ın Ollama'yı hiç
-görememesi yapısal bir gerçek olduğu için tek çalışabilir yol bu. Bunun
-çalışması için Ollama'nın kendi `OLLAMA_ORIGINS` ayarının `https://zdemir.tech`
-origin'ine izin vermesi gerekiyor (verilmezse Ollama isteği kendisi
-reddeder). Elle başlatılıyorsa: `OLLAMA_ORIGINS=https://zdemir.tech ollama
-serve`; systemd servisiyse: `sudo systemctl edit ollama` ile
-`Environment="OLLAMA_ORIGINS=https://zdemir.tech"` ekleyip `sudo systemctl
-restart ollama`.
+**Ollama'ya production'dan (zdemir.tech) doğrudan erişim — CORS + Private
+Network Access (bkz. PLAN.md Aşama 25 madde 5, Aşama 26):** tarayıcı,
+gerçek siteyi kullanırken bile Ollama'ya Render üzerinden değil DOĞRUDAN
+bağlanıyor — Render'ın Ollama'yı hiç görememesi yapısal bir gerçek olduğu
+için tek çalışabilir yol bu. Bunun için İKİ ayrı koruma katmanı aşılmalı:
+
+1. **CORS** — Ollama'nın kendi `OLLAMA_ORIGINS` ayarı `https://zdemir.tech`
+   origin'ine izin vermeli. Elle başlatılıyorsa: `OLLAMA_ORIGINS=https://
+   zdemir.tech ollama serve`; systemd servisiyse: `sudo systemctl edit
+   ollama` ile `Environment="OLLAMA_ORIGINS=https://zdemir.tech"` ekleyip
+   `sudo systemctl restart ollama`.
+2. **Private Network Access (Chrome/Brave)** — genel/HTTPS bir origin'den
+   (zdemir.tech) özel bir adrese (localhost) giden isteklerde tarayıcı
+   AYRICA hedefin `Access-Control-Allow-Private-Network: true` header'ıyla
+   cevap vermesini şart koşuyor. **`OLLAMA_ORIGINS` bunu çözmüyor** — bu
+   tamamen ayrı bir katman, Ollama'nın kendisi bu header'ı hiç
+   göndermiyor (bilinen, henüz çözülmemiş bir Ollama eksiği —
+   [ollama/ollama#7000](https://github.com/ollama/ollama/issues/7000)).
+   Bu yüzden proje köküne bağımsız, deploy EDİLMEYEN bir yerel röle
+   eklendi: **`ollama-relay.js`** — tarayıcı ile Ollama arasına girip
+   gerekli header'ları ekliyor (sadece `https://zdemir.tech` origin'ine
+   izin veriyor, sadece `127.0.0.1`'e bağlanıyor). `ollama.ts`'teki
+   production `BASE`'i artık Ollama'nın kendisine değil, bu röleye
+   (`localhost:11435`) gidiyor.
+
+   Ollama'yla BİRLİKTE sürekli çalışması gerekiyor. Elle: `node
+   ollama-relay.js`. Otomatik başlatmak için (Ollama'nın kendi
+   `ollama.service`'iyle aynı desende) bir kullanıcı systemd servisi
+   kurulu: `~/.config/systemd/user/ollama-relay.service` — kurulum:
+   ```
+   systemctl --user daemon-reload
+   systemctl --user enable --now ollama-relay.service
+   ```
+   **Önemli:** bu hesapta systemd "linger" kapalı olabilir
+   (`loginctl show-user $USER --property=Linger` ile kontrol edilir) —
+   kapalıysa `--user` servisleri (röle dahil) sadece aktif bir oturum
+   varken çalışır, oturum kapanınca durur. Sunucuya SSH ile bağlanıp
+   çıkılan bir kullanım deseni varsa `sudo loginctl enable-linger
+   $USER` ile bu servislerin oturumdan bağımsız sürekli çalışması
+   sağlanabilir.
 
 ### Mimari Karar 2: Google Calendar salt-okunur
 Google Calendar entegrasyonu OAuth ile iki yönlü bir senkronizasyon değil,
@@ -304,13 +334,15 @@ Telegram/SerpApi için sunucu tarafı vekil (proxy) görevi görüyor.
 
 - **Ollama sadece Ollama'nın kurulu olduğu bilgisayardan çalışır** —
   production sunucusu (Render) Ollama'yı hiçbir şekilde göremez, ama
-  (bkz. PLAN.md Aşama 25 madde 5) tarayıcı artık `zdemir.tech`'i o
+  (bkz. PLAN.md Aşama 25/26) tarayıcı artık `zdemir.tech`'i o
   bilgisayardan açtığında Ollama'ya DOĞRUDAN bağlanıyor (Render'ı
-  atlayarak) — bunun için Ollama'nın `OLLAMA_ORIGINS` ayarının
-  `https://zdemir.tech`'e izin vermesi şart (bkz. yukarıdaki "Ollama CORS
-  ayarı"). Bu ayar yapılmadıysa (ya da başka bir cihazdan açıldıysa)
-  içerik "işlenmemiş" kalır, Ollama'nın erişilebilir olduğu bilgisayardan
-  bir sonraki açılışta otomatik işlenir.
+  atlayarak) — bunun için hem Ollama'nın `OLLAMA_ORIGINS` ayarının
+  `https://zdemir.tech`'e izin vermesi HEM de yerel `ollama-relay.js`
+  röle script'inin Ollama'yla birlikte çalışıyor olması şart (bkz.
+  yukarıdaki "Ollama'ya production'dan doğrudan erişim"). Bu ikisinden
+  biri eksikse (ya da başka bir cihazdan açıldıysa) içerik "işlenmemiş"
+  kalır, ikisinin de çalıştığı bilgisayardan bir sonraki açılışta
+  otomatik işlenir.
 - **Render'ın ücretsiz planı boşta kalınca uyur** — bir süre trafik
   almayan servis "uykuya" geçer ve uyanırken kendi markalı bir ekran
   gösterir. Bunu tamamen ortadan kaldırmak için bir GitHub Actions

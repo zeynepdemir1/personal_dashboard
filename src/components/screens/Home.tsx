@@ -1,7 +1,7 @@
 import { useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useApp } from '../../state/AppState';
 import { colors, fonts, pillStyle, dayBlockStyle, gcalBlockStyle, HOUR_ROW_HEIGHT, MOBILE_BREAKPOINT } from '../../lib/theme';
-import { LINKS, PROGRAMS, TOPICS, timeToHour, TODAY } from '../../lib/data';
+import { LINKS, PROGRAMS, TOPICS, LINK_KINDS, timeToHour, TODAY } from '../../lib/data';
 import { computeHomeStats, computeClosedTopicsThisMonth } from '../../lib/stats';
 import {
   daysLeftUntil,
@@ -130,11 +130,12 @@ export function Home() {
     }));
   const openTopics = [...extraTopicsList, ...allTopics.filter((t) => !t.done)].slice(0, 6);
 
-  const homeLinks = [...app.extraLinks, ...LINKS].slice(0, 3).map((l) => ({
+  const homeLinks = [...app.extraLinks, ...LINKS].slice(0, 3).map((l, i) => ({
     title: l.title,
     kind: l.kind || 'Link',
     open: () =>
       app.openLinkMenu({
+        id: i < app.extraLinks.length ? app.extraLinks[i].id : undefined,
         title: l.title,
         url: l.url || '',
         kind: l.kind || 'Link',
@@ -328,24 +329,65 @@ export function Home() {
 
       <section style={gridThree}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, border: `1px solid ${colors.border}`, background: colors.panel, padding: '20px 20px 18px', borderRadius: 4 }}>
-          <h2 style={{ margin: 0, fontFamily: fonts.serif, fontSize: 17, fontWeight: 500, color: colors.ink }}>Linkler</h2>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+            <h2 style={{ margin: 0, fontFamily: fonts.serif, fontSize: 17, fontWeight: 500, color: colors.ink }}>Linkler</h2>
+            {!app.addingLinkForm && (
+              <span
+                onClick={app.startAddLinkForm}
+                className="hover-underline"
+                style={{ fontFamily: fonts.sans, fontSize: 11, color: colors.rose, cursor: 'pointer', borderBottom: '1px solid transparent', paddingBottom: 1 }}
+              >
+                + Ekle
+              </span>
+            )}
+          </div>
           {homeLinks.map((l, i) => (
             <div key={i} onClick={l.open} className="hover-row" style={{ display: 'flex', flexDirection: 'column', gap: 2, cursor: 'pointer', padding: '6px 8px', margin: '0 -8px', borderRadius: 3 }}>
               <span style={{ fontSize: 14, color: colors.ink, lineHeight: 1.35 }}>{l.title}</span>
               <span style={{ fontFamily: fonts.sans, fontSize: 10, color: colors.inkFainter }}>{l.kind}</span>
             </div>
           ))}
-          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-            <input
-              value={app.qLink}
-              onChange={(e) => app.setQLink(e.target.value)}
-              placeholder="Link yapıştır…"
-              style={{ flex: 1, padding: '8px 10px', border: `1px solid ${colors.borderStrong}`, background: '#FFFFFF', fontSize: 12.5, color: colors.ink, outline: 'none', borderRadius: 3 }}
-            />
-            <div onClick={app.addLink} className="btn-dark" style={{ padding: '8px 12px', fontSize: 12, cursor: 'pointer', borderRadius: 3 }}>
-              Ekle
+          {app.addingLinkForm && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+              <input
+                value={app.qLinkUrl}
+                onChange={(e) => app.setQLinkUrl(e.target.value)}
+                placeholder="URL…"
+                style={{ padding: '8px 10px', border: `1px solid ${colors.borderStrong}`, background: '#FFFFFF', fontSize: 12.5, color: colors.ink, outline: 'none', borderRadius: 3 }}
+              />
+              <input
+                value={app.qLinkTitle}
+                onChange={(e) => app.setQLinkTitle(e.target.value)}
+                placeholder="Başlık (boş bırakılırsa URL'den türetilir)…"
+                style={{ padding: '8px 10px', border: `1px solid ${colors.borderStrong}`, background: '#FFFFFF', fontSize: 12.5, color: colors.ink, outline: 'none', borderRadius: 3 }}
+              />
+              <textarea
+                value={app.qLinkNote}
+                onChange={(e) => app.setQLinkNote(e.target.value)}
+                placeholder="Not (opsiyonel)…"
+                style={{ padding: '8px 10px', border: `1px solid ${colors.borderStrong}`, background: '#FFFFFF', fontSize: 12.5, color: colors.ink, outline: 'none', borderRadius: 3, minHeight: 44, resize: 'vertical' }}
+              />
+              <select
+                value={app.qLinkKind}
+                onChange={(e) => app.setQLinkKind(e.target.value)}
+                style={{ padding: '8px 10px', border: `1px solid ${colors.borderStrong}`, background: '#FFFFFF', fontSize: 12.5, color: colors.ink, outline: 'none', borderRadius: 3, cursor: 'pointer' }}
+              >
+                {LINK_KINDS.map((k) => (
+                  <option key={k} value={k}>
+                    {k}
+                  </option>
+                ))}
+              </select>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                <div onClick={app.cancelAddLinkForm} className="btn-outline-hover" style={{ padding: '8px 12px', border: `1px solid ${colors.borderStrong}`, color: colors.inkSoft, fontSize: 12, cursor: 'pointer', borderRadius: 3 }}>
+                  Vazgeç
+                </div>
+                <div onClick={app.saveLinkForm} className="btn-dark" style={{ padding: '8px 12px', fontSize: 12, cursor: 'pointer', borderRadius: 3 }}>
+                  Ekle
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, border: `1px solid ${colors.border}`, background: colors.panel, padding: '20px 20px 18px', borderRadius: 4 }}>

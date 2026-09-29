@@ -15,15 +15,22 @@ import { useEffect, useState } from 'react';
 // davranış Aşama 13'ten beri hep böyleydi (Aşama 20'nin bir regresyonu
 // DEĞİL, ama gerçek kök neden buydu).
 //
-// Düzeltme: production build'de tarayıcı artık `http://localhost:11434`'e
-// DOĞRUDAN istek atıyor (Render üzerinden değil) — bu, sadece tarayıcının
-// çalıştığı makinede gerçekten bir Ollama varsa başarılı olur (Zeynep'in
-// senaryosu tam olarak bu). HTTPS bir sayfadan http://localhost'a istek
-// atmak tarayıcılarda (Chrome 94+) mixed-content olarak engellenmiyor —
-// localhost için özel bir istisna var. TEK GEREKEN: Ollama'nın kendi CORS
-// ayarı (OLLAMA_ORIGINS) zdemir.tech'e izin vermeli, yoksa Ollama isteği
-// kendisi reddeder (bkz. README "Ollama CORS" notu).
-const BASE = import.meta.env.DEV ? '/api/ollama' : 'http://localhost:11434';
+// Düzeltme: production build'de tarayıcı artık Render üzerinden değil,
+// DOĞRUDAN localhost'a istek atıyor (Zeynep'in kendi bilgisayarında).
+// HTTPS bir sayfadan http://localhost'a istek atmak tarayıcılarda mixed-
+// content olarak engellenmiyor (localhost için özel bir istisna var).
+//
+// PLAN.md Aşama 26 ek düzeltme: Ollama'ya (port 11434) DOĞRUDAN gitmek
+// yetmedi — Chrome'un "Private Network Access" kısıtlaması, genel/HTTPS
+// bir origin'den (zdemir.tech) özel bir adrese (localhost) giden istekte
+// hedefin `Access-Control-Allow-Private-Network: true` header'ıyla cevap
+// vermesini şart koşuyor. Ollama bu header'ı hiç göndermiyor (bilinen,
+// henüz çözülmemiş bir Ollama eksiği — ollama/ollama#7000), OLLAMA_ORIGINS
+// bunu çözmüyor. Bu yüzden istek artık Ollama'nın ÖNÜNE konan küçük bir
+// yerel röleye (bkz. ollama-relay.js, proje kökünde) gidiyor — o script
+// doğru header'ları ekleyip isteği gerçek Ollama'ya yönlendiriyor. Zeynep'in
+// bu röleyi Ollama'yla birlikte çalıştırması gerekiyor (bkz. README).
+const BASE = import.meta.env.DEV ? '/api/ollama' : 'http://localhost:11435';
 const MODEL = 'llama3.1:8b';
 
 export interface OllamaStatus {

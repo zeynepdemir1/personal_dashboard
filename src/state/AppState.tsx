@@ -45,6 +45,10 @@ function makeId(prefix: string): string {
 // detay görünümüne açılıyor, bu yüzden menü artık sadece title/url değil
 // tüm link kaydını taşıyor.
 interface LinkMenuData {
+  // PLAN.md Aşama 26: sadece kullanıcının kendi eklediği (extra) linklerde
+  // dolu — düzenleme/silme sadece bunlarda mümkün, statik/seed linklerde
+  // (şu an zaten boş, bkz. Aşama 25 madde 3) id yok.
+  id?: string;
   title: string;
   url: string;
   kind: string;
@@ -335,10 +339,8 @@ export interface AppStateValue {
   hiddenPrograms: string[];
   hideStaticProgram: (title: string) => void;
 
-  qLink: string;
-  setQLink: (v: string) => void;
-  addLink: () => void;
   removeExtraLink: (id: string) => void;
+  updateExtraLink: (id: string, patch: Partial<ExtraLink>) => void;
 
   addingLinkForm: boolean;
   qLinkTitle: string;
@@ -676,7 +678,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [qProgramDate, setQProgramDate] = useState('');
   const [qProgramNote, setQProgramNote] = useState('');
   const [qProgramLink, setQProgramLink] = useState('');
-  const [qLink, setQLink] = useState('');
   const [addingLinkForm, setAddingLinkForm] = useState(false);
   const [qLinkTitle, setQLinkTitle] = useState('');
   const [qLinkUrl, setQLinkUrl] = useState('');
@@ -958,21 +959,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         patch({ hiddenPrograms: [...persistedRef.current.hiddenPrograms, title] });
       },
 
-      qLink,
-      setQLink,
-      addLink: () => {
-        const v = qLink.trim();
-        if (!v) return;
-        patch({
-          extraLinks: [
-            { id: makeId('link'), title: v, kind: 'Link', url: '', note: '', tags: [], date: TODAY },
-            ...persistedRef.current.extraLinks,
-          ],
-        });
-        setQLink('');
-      },
       removeExtraLink: (id: string) => {
         patch({ extraLinks: persistedRef.current.extraLinks.filter((l) => l.id !== id) });
+      },
+      updateExtraLink: (id: string, p: Partial<ExtraLink>) => {
+        patch({ extraLinks: persistedRef.current.extraLinks.map((l) => (l.id === id ? { ...l, ...p } : l)) });
       },
 
       addingLinkForm,
@@ -1391,7 +1382,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       qProgramDate,
       qProgramNote,
       qProgramLink,
-      qLink,
       addingLinkForm,
       qLinkTitle,
       qLinkUrl,

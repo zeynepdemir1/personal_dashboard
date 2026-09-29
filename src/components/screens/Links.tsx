@@ -26,6 +26,7 @@ export function Links() {
     tags: l.tags || [],
     open: () =>
       app.openLinkMenu({
+        id: i < app.extraLinks.length ? app.extraLinks[i].id : undefined,
         title: l.title,
         url: l.url || '',
         kind: l.kind || 'Link',
