@@ -373,12 +373,16 @@ Telegram/SerpApi için sunucu tarafı vekil (proxy) görevi görüyor.
 
 ## Güvenlik
 
-- **Site geneli giriş:** Tek paylaşılan parola (`SITE_PASSWORD`) + imzalı,
-  stateless bir oturum çerezi (30 gün). Oturum sunucuda saklanmıyor —
-  Render sık sık yeniden başladığı için bellekte tutulan bir oturum
-  listesi işe yaramaz. `SESSION_SECRET`'ı değiştirmek tüm oturumları aynı
-  anda geçersiz kılar (şüpheli bir erişimden sonra "herkesi çıkışa
-  zorlamak" için kullanılabilir).
+- **Site geneli giriş:** Tek paylaşılan parola + imzalı, stateless bir
+  oturum çerezi (30 gün). Oturum sunucuda saklanmıyor — Render sık sık
+  yeniden başladığı için bellekte tutulan bir oturum listesi işe yaramaz.
+  `SESSION_SECRET`'ı değiştirmek tüm oturumları aynı anda geçersiz kılar
+  (şüpheli bir erişimden sonra "herkesi çıkışa zorlamak" için
+  kullanılabilir). **Parola artık sabit değil** (bkz. PLAN.md Aşama 28):
+  `SITE_PASSWORD` env değişkeni sadece ilk değer/yedek — profil
+  menüsündeki "Parola değiştir" ile (mevcut parola doğrulanarak) Redis'e
+  yeni bir parola yazılabiliyor, `/api/login` ondan sonra hep Redis'teki
+  değeri esas alıyor.
 - IP başına 5 başarısız giriş denemesinden sonra 60 saniyelik kilit
   (bellek içi, Render yeniden başlayınca sıfırlanır — tam bir çözüm değil
   ama otomatik parola denemesini pratik olmaktan çıkarır).

@@ -490,6 +490,16 @@ Aşama 25'in "Ollama düzeltildi" özetinin ardından Zeynep gerçek kullanımda
 - [x] **Güvenlik notu:** Bu uç nokta giriş korumasının DIŞINDA (kilitliyken de çalışması gerekiyor, `/api/login` ile aynı istisna listesinde) — yani teorik olarak herkes çağırabilir. Ama HTTP yanıtında parola ASLA dönmüyor (`{ok:true}` dışında hiçbir şey) — çağıran kişi parolayı öğrenemez, sadece Zeynep'in Telegram'ına ulaşır. IP başına 5 dakikalık bir soğuma süresiyle (`forgotPasswordAttempts`, bellek içi) Telegram'ın spam mesajla doldurulması engelleniyor. Telegram yapılandırılı değilse (`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` yoksa) buton hiç gösterilmiyor.
 - [x] **Gerçek uçtan uca doğrulama:** Yerel sunucuya karşı gerçek bir istek atıldı — Telegram'a gerçekten bir mesaj gitti (Zeynep'in kendi Telegram'ından kontrol edebilir), ikinci art arda istek doğru şekilde 429 (soğuma süresi) ile reddedildi.
 
+## Aşama 28 — Parola Değiştirme ✅
+
+**Durum:** Aşama 27'de "şifremi unuttum" ile Telegram'a giden parolanın YEREL test ortamından (benim `.env.local`'ımdan) gönderildiği için gerçek production parolasından farklı olduğu ortaya çıktı (kafa karıştırıcıydı, ama iki ayrı ortam olduğu için beklenen bir durumdu). Zeynep bunun üzerine asıl istediğini netleştirdi: kendi seçtiği bir parolaya geçebilmek, `SITE_PASSWORD` sabit env değişkenine bağımlı kalmamak.
+
+- [x] **Mimari:** `SITE_PASSWORD` env değişkeni artık sadece bir İLK DEĞER/yedek — Redis'te (`auth:password`) değiştirilmiş bir parola varsa o kullanılıyor (`getActivePassword()`, `server.js`). Redis'e ulaşılamazsa (geçici ağ sorunu) yine env değişkenine düşülüyor, giriş tamamen kilitlenmiyor.
+- [x] `/api/login` ve `/api/forgot-password` artık `SITE_PASSWORD` yerine `getActivePassword()` kullanıyor — parola değiştirildikten sonra hem giriş hem "şifremi unuttum" YENİ parolayı esas alıyor.
+- [x] Yeni `POST /api/change-password` — mevcut parolayı doğrulayıp (yanlışsa reddeder), yeni parolayı (en az 6 karakter, aksi halde reddeder) Redis'e yazıyor. **Bilerek** auth middleware'inin istisna listesinde DEĞİL — yani sadece zaten geçerli bir oturumu olan biri çağırabilir (açık bırakılmış bir oturumdan rastgele parola değiştirilemesin diye ayrıca mevcut parola da isteniyor).
+- [x] Sidebar profil menüsüne "Parola değiştir" eklendi (mevcut parola + yeni parola + yeni parola tekrar, "Profili düzenle"/"Çıkış yap" ile aynı yerde).
+- [x] **Uçtan uca doğrulandı** (gerçek `auth:password` anahtarına DOKUNMADAN, geçici bir test anahtarıyla — bkz. Aşama 20/21'deki aynı test-güvenliği yöntemi): parola değiştirildi → ESKİ parolayla giriş denemesi doğru şekilde reddedildi → YENİ parolayla giriş başarılı oldu → yanlış "mevcut parola" ile değiştirme denemesi 401 ile reddedildi → 6 karakterden kısa yeni parola 400 ile reddedildi. Test sonrası gerçek `auth:password` anahtarının hâlâ hiç var olmadığı (Zeynep'in gerçek girişi hâlâ `SITE_PASSWORD` env değişkenine bağlı) doğrulandı.
+
 ## Gelecek fikirleri (henüz plana alınmadı, sadece not)
 - Arka plan görselleri için otomatik/AI üretilen görsellere geçiş — Aşama 21'de bunun yerine sitenden doğrudan yükleme/silme (self-servis) tercih edildi, bu fikir hâlâ ayrı bir olasılık olarak (ör. hiç fotoğraf eklenmediğinde bir "varsayılan AI seti" gibi) not düşülüyor.
 - Anahtar kelimelerin kullanıcı içeriğinden otomatik çıkarılması (bkz. Aşama 11).

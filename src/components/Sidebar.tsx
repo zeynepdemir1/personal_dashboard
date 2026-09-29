@@ -89,6 +89,55 @@ export function Sidebar() {
     }
   };
 
+  // PLAN.md Aşama 28: site parolası eskiden sabit bir env değişkeniydi,
+  // değiştirmek Render panelinden elle yapılıp yeniden deploy gerektirirdi
+  // — artık buradan (mevcut parolayı doğrulayarak) değiştirilebiliyor.
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSaving, setPwSaving] = useState(false);
+
+  const startChangePassword = () => {
+    setCurrentPw('');
+    setNewPw('');
+    setConfirmPw('');
+    setPwError(null);
+    setChangingPassword(true);
+  };
+  const cancelChangePassword = () => setChangingPassword(false);
+  const submitChangePassword = async () => {
+    setPwError(null);
+    if (newPw.trim().length < 6) {
+      setPwError('Yeni parola en az 6 karakter olmalı.');
+      return;
+    }
+    if (newPw !== confirmPw) {
+      setPwError('Yeni parolalar eşleşmiyor.');
+      return;
+    }
+    setPwSaving(true);
+    try {
+      const res = await fetch('/api/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw.trim() }),
+      });
+      if (res.ok) {
+        setChangingPassword(false);
+      } else if (res.status === 401) {
+        setPwError('Mevcut parola yanlış.');
+      } else {
+        setPwError('Değiştirilemedi, tekrar dene.');
+      }
+    } catch {
+      setPwError('Bağlantı hatası, tekrar dene.');
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
   const mobileWidth = Math.min(Math.round(app.width * 0.8), 280);
   const asideStyle: CSSProperties = mobile
     ? {
@@ -285,7 +334,7 @@ export function Sidebar() {
           <span style={{ marginLeft: 'auto', fontSize: 14, color: colors.inkFaint }}>⋯</span>
         </div>
 
-        {app.profileOpen && !app.editingProfile && (
+        {app.profileOpen && !app.editingProfile && !changingPassword && (
           <div
             style={{
               display: 'flex',
@@ -299,9 +348,92 @@ export function Sidebar() {
             <span onClick={app.startEditProfile} className="text-hover-rose" style={{ cursor: 'pointer' }}>
               Profili düzenle
             </span>
+            <span onClick={startChangePassword} className="text-hover-rose" style={{ cursor: 'pointer' }}>
+              Parola değiştir
+            </span>
             <span onClick={handleLogout} className="text-hover-red" style={{ cursor: 'pointer' }}>
               Çıkış yap
             </span>
+          </div>
+        )}
+
+        {app.profileOpen && changingPassword && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              padding: '4px 8px 2px',
+            }}
+          >
+            <input
+              type="password"
+              value={currentPw}
+              onChange={(e) => setCurrentPw(e.target.value)}
+              placeholder="Mevcut parola"
+              autoComplete="current-password"
+              style={{
+                padding: '7px 9px',
+                border: `1px solid ${colors.borderStrong}`,
+                background: colors.panel,
+                fontFamily: fonts.sans,
+                fontSize: 12.5,
+                color: colors.ink,
+                outline: 'none',
+                borderRadius: 3,
+              }}
+            />
+            <input
+              type="password"
+              value={newPw}
+              onChange={(e) => setNewPw(e.target.value)}
+              placeholder="Yeni parola (en az 6 karakter)"
+              autoComplete="new-password"
+              style={{
+                padding: '7px 9px',
+                border: `1px solid ${colors.borderStrong}`,
+                background: colors.panel,
+                fontFamily: fonts.sans,
+                fontSize: 12.5,
+                color: colors.ink,
+                outline: 'none',
+                borderRadius: 3,
+              }}
+            />
+            <input
+              type="password"
+              value={confirmPw}
+              onChange={(e) => setConfirmPw(e.target.value)}
+              placeholder="Yeni parola (tekrar)"
+              autoComplete="new-password"
+              style={{
+                padding: '7px 9px',
+                border: `1px solid ${colors.borderStrong}`,
+                background: colors.panel,
+                fontFamily: fonts.sans,
+                fontSize: 12.5,
+                color: colors.ink,
+                outline: 'none',
+                borderRadius: 3,
+              }}
+            />
+            {pwError && <span style={{ fontSize: 11, color: '#B0554F' }}>{pwError}</span>}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <div
+                onClick={cancelChangePassword}
+                className="btn-outline-hover"
+                style={{ flex: 1, padding: '6px 0', textAlign: 'center', border: `1px solid ${colors.borderStrong}`, color: colors.inkSoft, fontSize: 12, cursor: 'pointer', borderRadius: 3 }}
+              >
+                Vazgeç
+              </div>
+              <div
+                onClick={pwSaving ? undefined : submitChangePassword}
+                className="btn-dark"
+                style={{ flex: 1, padding: '6px 0', textAlign: 'center', fontSize: 12, cursor: pwSaving ? 'default' : 'pointer', borderRadius: 3, opacity: pwSaving ? 0.6 : 1 }}
+              >
+                {pwSaving ? 'kaydediliyor…' : 'Kaydet'}
+              </div>
+            </div>
           </div>
         )}
 

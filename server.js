@@ -102,6 +102,25 @@ if (!AUTH_CONFIGURED) {
   console.warn('[server] SITE_PASSWORD/SESSION_SECRET tanımlı değil — site KORUMASIZ kalacak. Bunu production\'da ASLA böyle bırakma.');
 }
 
+// PLAN.md Aşama 28 — Zeynep site parolasını kendi belirlediği bir şeyle
+// değiştirebilsin istedi (eskiden SITE_PASSWORD sabit bir env değişkeniydi,
+// değiştirmek Render'ın panelinden elle yapılıp yeniden deploy gerektirirdi).
+// Redis'te (`auth:password`) DEĞİŞTİRİLMİŞ bir parola varsa o kullanılıyor;
+// yoksa (hiç değiştirilmemişse) env değişkenine (SITE_PASSWORD) düşülüyor —
+// böylece ilk kurulumda hiçbir şey bozulmuyor. Redis'e ulaşılamazsa (geçici
+// bir ağ sorunu) da env değişkenine düşülüyor, giriş tamamen kilitlenmiyor.
+async function getActivePassword() {
+  if (UPSTASH_CONFIGURED) {
+    try {
+      const stored = await redis('GET', 'auth:password');
+      if (typeof stored === 'string' && stored) return stored;
+    } catch (err) {
+      console.error('[server] Redis\'ten aktif parola okunamadı, env değişkenine düşülüyor:', err);
+    }
+  }
+  return SITE_PASSWORD;
+}
+
 const SESSION_COOKIE = 'mgp_session';
 const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 gün
 // GitHub Actions'ın X-Cron-Secret ile zaten kendi başına koruduğu uç
@@ -285,7 +304,7 @@ app.use((req, res, next) => {
   res.type('html').send(LOGIN_PAGE_HTML);
 });
 
-app.post('/api/login', express.json(), (req, res) => {
+app.post('/api/login', express.json(), async (req, res) => {
   if (!AUTH_CONFIGURED) {
     res.status(503).json({ error: 'auth not configured' });
     return;
@@ -297,7 +316,8 @@ app.post('/api/login', express.json(), (req, res) => {
     return;
   }
   const password = req.body?.password;
-  const ok = typeof password === 'string' && timingSafeStringEqual(password, SITE_PASSWORD);
+  const activePassword = await getActivePassword();
+  const ok = typeof password === 'string' && timingSafeStringEqual(password, activePassword);
   checkAndRecordLoginAttempt(ip, ok);
   if (!ok) {
     res.status(401).json({ error: 'wrong password' });
@@ -350,13 +370,55 @@ app.post('/api/forgot-password', async (req, res) => {
   }
   forgotPasswordAttempts.set(ip, now);
   try {
+    const activePassword = await getActivePassword();
     await sendTelegramMessage(
-      `🔑 Mühendis Gelişim Portalı — giriş sayfasındaki "Şifremi unuttum" ile istendi.\n\nParolan: ${SITE_PASSWORD}`,
+      `🔑 Mühendis Gelişim Portalı — giriş sayfasındaki "Şifremi unuttum" ile istendi.\n\nParolan: ${activePassword}`,
     );
     res.json({ ok: true });
   } catch (err) {
     console.error('[server] Şifre hatırlatma Telegram mesajı gönderilemedi:', err);
     res.status(502).json({ error: 'send failed' });
+  }
+});
+
+// Parola değiştirme (bkz. PLAN.md Aşama 28) — Zeynep kendi seçtiği bir
+// parolaya geçebilsin istedi (eskiden SITE_PASSWORD sabit bir env
+// değişkeniydi, değiştirmek Render panelinden elle yapılıp yeniden
+// deploy gerektirirdi). Bu uç nokta BİLEREK auth middleware'inin
+// İSTİSNA listesinde DEĞİL — yani sadece zaten giriş yapmış (geçerli
+// oturum çerezi olan) biri çağırabilir; ayrıca mevcut parolayı da
+// doğru bilmesi gerekiyor (açık bırakılmış bir oturumdan rastgele
+// parola değiştirilemesin diye).
+app.post('/api/change-password', express.json(), async (req, res) => {
+  if (!AUTH_CONFIGURED) {
+    res.status(503).json({ error: 'auth not configured' });
+    return;
+  }
+  const { currentPassword, newPassword } = req.body || {};
+  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
+    res.status(400).json({ error: 'invalid input' });
+    return;
+  }
+  const trimmedNew = newPassword.trim();
+  if (trimmedNew.length < 6) {
+    res.status(400).json({ error: 'new password too short' });
+    return;
+  }
+  const activePassword = await getActivePassword();
+  if (!timingSafeStringEqual(currentPassword, activePassword)) {
+    res.status(401).json({ error: 'wrong current password' });
+    return;
+  }
+  if (!UPSTASH_CONFIGURED) {
+    res.status(503).json({ error: 'storage not configured' });
+    return;
+  }
+  try {
+    await redis('SET', 'auth:password', trimmedNew);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[server] Parola değiştirilemedi:', err);
+    res.status(502).json({ error: 'write failed' });
   }
 });
 
