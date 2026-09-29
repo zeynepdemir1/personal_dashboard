@@ -56,7 +56,7 @@ export function LinkMenu() {
               </div>
             )}
             {app.linkMenu.note && (
-              <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: colors.inkSoft, textWrap: 'pretty' }}>
+              <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.6, color: colors.inkSoft, textWrap: 'pretty' }}>
                 {app.linkMenu.note}
               </p>
             )}
@@ -78,7 +78,7 @@ export function LinkMenu() {
             className={app.linkMenu.url ? 'btn-dark' : undefined}
             style={{
               padding: '11px 14px',
-              fontSize: 13,
+              fontSize: 14,
               textAlign: 'center',
               borderRadius: 4,
               ...(app.linkMenu.url
@@ -96,7 +96,7 @@ export function LinkMenu() {
                 padding: '11px 14px',
                 border: `1px solid ${colors.borderStrong}`,
                 color: colors.inkSoft,
-                fontSize: 13,
+                fontSize: 14,
                 textAlign: 'center',
                 cursor: 'pointer',
                 borderRadius: 4,
@@ -112,7 +112,7 @@ export function LinkMenu() {
               padding: '11px 14px',
               border: `1px solid ${colors.borderStrong}`,
               color: colors.inkSoft,
-              fontSize: 13,
+              fontSize: 14,
               textAlign: 'center',
               cursor: 'pointer',
               borderRadius: 4,

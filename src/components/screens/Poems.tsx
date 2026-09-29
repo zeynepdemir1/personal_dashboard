@@ -49,7 +49,7 @@ export function Poems() {
           Şiir
         </h1>
         {!adding && (
-          <div onClick={startAdd} className="btn-dark" style={{ padding: '10px 16px', fontSize: 13, cursor: 'pointer', borderRadius: 3, whiteSpace: 'nowrap' }}>
+          <div onClick={startAdd} className="btn-dark" style={{ padding: '10px 16px', fontSize: 14, cursor: 'pointer', borderRadius: 3, whiteSpace: 'nowrap' }}>
             Yeni şiir
           </div>
         )}
@@ -65,10 +65,10 @@ export function Poems() {
             style={{ ...inputStyle, fontSize: 16, lineHeight: 1.7, minHeight: 140, resize: 'vertical' }}
           />
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <div onClick={cancel} className="btn-outline-hover" style={{ padding: '9px 16px', border: `1px solid ${colors.borderStrong}`, color: colors.inkSoft, fontSize: 13, cursor: 'pointer', borderRadius: 3 }}>
+            <div onClick={cancel} className="btn-outline-hover" style={{ padding: '9px 16px', border: `1px solid ${colors.borderStrong}`, color: colors.inkSoft, fontSize: 14, cursor: 'pointer', borderRadius: 3 }}>
               Vazgeç
             </div>
-            <div onClick={save} className="btn-dark" style={{ padding: '9px 16px', fontSize: 13, cursor: 'pointer', borderRadius: 3 }}>
+            <div onClick={save} className="btn-dark" style={{ padding: '9px 16px', fontSize: 14, cursor: 'pointer', borderRadius: 3 }}>
               Kaydet
             </div>
           </div>

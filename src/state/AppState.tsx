@@ -8,7 +8,7 @@ import {
   type DayNote,
   type GrowthNote,
 } from '../lib/data';
-import { makeLearnEntry, stripHtml, type LearnEntry } from '../lib/learn';
+import { makeLearnEntry, stripHtml, deriveFromHtml, type LearnEntry } from '../lib/learn';
 import { deriveTitleFromUrl } from '../lib/url';
 import { fetchGoogleCalendarEvents, type GCalEvent, type GCalSyncStatus } from '../lib/googleCalendar';
 import { analyzeDiscoveredProgram, pingOllama, summarizeLearnEntry } from '../lib/ollama';
@@ -164,6 +164,43 @@ function normalizeExtraProjects(raw: unknown): ExtraProject[] {
   });
 }
 
+// PLAN.md Aşama 25 madde 7: eski ExtraLink şeklinde id yoktu (silinemiyordu)
+// — canlıdaki gerçek kullanıcı verisini sessizce yeni şekle taşı.
+function normalizeExtraLinks(raw: unknown): ExtraLink[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => {
+    const l = item as Partial<ExtraLink>;
+    return {
+      id: l.id ?? makeId('legacy-link'),
+      title: l.title ?? '',
+      kind: l.kind ?? 'Link',
+      kindColor: l.kindColor,
+      url: l.url ?? '',
+      note: l.note ?? '',
+      tags: Array.isArray(l.tags) ? l.tags : [],
+      date: l.date,
+    };
+  });
+}
+
+// PLAN.md Aşama 25 madde 2: eski ExtraTopic şeklinde id/done/addedDate
+// yoktu (yeni topic'ler ne değiştirilemiyor ne silinebiliyordu) —
+// canlıdaki gerçek kullanıcı verisini sessizce yeni şekle taşı.
+function normalizeExtraTopics(raw: unknown): ExtraTopic[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => {
+    const t = item as Partial<ExtraTopic>;
+    return {
+      id: t.id ?? makeId('legacy-topic'),
+      title: t.title ?? '',
+      image: t.image,
+      addedDate: t.addedDate ?? TODAY,
+      done: t.done ?? false,
+      doneDate: t.doneDate ?? '',
+    };
+  });
+}
+
 // PLAN.md Aşama 22: dayNotes anahtarları eskiden "ayın kaçı" (1-30, hep
 // Eylül 2026 anlamına geliyordu) idi, artık tam YYYY-MM-DD. Canlıda
 // (Render) zaten eski numaralı anahtarlarla kaydedilmiş gerçek kullanıcı
@@ -195,6 +232,8 @@ function normalizeLoadedState(parsed: unknown, mobile: boolean): PersistedState 
     ...p,
     extraPrograms: normalizeExtraPrograms(p.extraPrograms),
     extraProjects: normalizeExtraProjects(p.extraProjects),
+    extraTopics: normalizeExtraTopics(p.extraTopics),
+    extraLinks: normalizeExtraLinks(p.extraLinks),
     diaryEntries: Array.isArray(p.diaryEntries) ? (p.diaryEntries as DiaryEntryX[]) : base.diaryEntries,
     diarySecurity:
       p.diarySecurity && typeof p.diarySecurity === 'object' && (p.diarySecurity as DiarySecurity).enabled
@@ -299,6 +338,7 @@ export interface AppStateValue {
   qLink: string;
   setQLink: (v: string) => void;
   addLink: () => void;
+  removeExtraLink: (id: string) => void;
 
   addingLinkForm: boolean;
   qLinkTitle: string;
@@ -316,10 +356,13 @@ export interface AppStateValue {
   qTopic: string;
   setQTopic: (v: string) => void;
   addTopic: (image?: string) => void;
+  toggleExtraTopic: (id: string) => void;
+  removeExtraTopic: (id: string) => void;
 
   qProject: string;
   setQProject: (v: string) => void;
   addProject: (image?: string) => void;
+  removeExtraProject: (id: string) => void;
 
   extraLinks: ExtraLink[];
   extraTopics: ExtraTopic[];
@@ -334,6 +377,8 @@ export interface AppStateValue {
   startAddLearnEntry: () => void;
   cancelAddLearnEntry: () => void;
   saveLearnEntry: (bodyHtml: string) => void;
+  updateLearnEntry: (id: string, title: string, bodyHtml: string) => void;
+  removeLearnEntry: (id: string) => void;
 
   topicOverrides: Record<number, TopicOverride>;
   toggleTopicAt: (i: number) => void;
@@ -920,11 +965,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (!v) return;
         patch({
           extraLinks: [
-            { title: v, kind: 'Link', url: '', note: '', tags: [], date: TODAY },
+            { id: makeId('link'), title: v, kind: 'Link', url: '', note: '', tags: [], date: TODAY },
             ...persistedRef.current.extraLinks,
           ],
         });
         setQLink('');
+      },
+      removeExtraLink: (id: string) => {
+        patch({ extraLinks: persistedRef.current.extraLinks.filter((l) => l.id !== id) });
       },
 
       addingLinkForm,
@@ -950,7 +998,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const title = qLinkTitle.trim() || deriveTitleFromUrl(url);
         patch({
           extraLinks: [
-            { title, kind: qLinkKind, url, note: qLinkNote.trim(), tags: [], date: TODAY },
+            { id: makeId('link'), title, kind: qLinkKind, url, note: qLinkNote.trim(), tags: [], date: TODAY },
             ...persistedRef.current.extraLinks,
           ],
         });
@@ -968,11 +1016,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (!v && !image) return;
         patch({
           extraTopics: [
-            { title: v || 'Fotoğraf notu', image },
+            { id: makeId('topic'), title: v || 'Fotoğraf notu', image, addedDate: TODAY, done: false, doneDate: '' },
             ...persistedRef.current.extraTopics,
           ],
         });
         setQTopic('');
+      },
+      toggleExtraTopic: (id: string) => {
+        patch({
+          extraTopics: persistedRef.current.extraTopics.map((t) =>
+            t.id === id ? { ...t, done: !t.done, doneDate: !t.done ? TODAY : '' } : t,
+          ),
+        });
+      },
+      removeExtraTopic: (id: string) => {
+        patch({ extraTopics: persistedRef.current.extraTopics.filter((t) => t.id !== id) });
       },
 
       qProject,
@@ -996,6 +1054,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           ],
         });
         setQProject('');
+      },
+      removeExtraProject: (id: string) => {
+        patch({ extraProjects: persistedRef.current.extraProjects.filter((p) => p.id !== id) });
       },
 
       extraLinks: persisted.extraLinks,
@@ -1211,6 +1272,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           if (!summary) return;
           recordLearnSummary(entry.id, title, summary);
         });
+      },
+      updateLearnEntry: (id: string, title: string, bodyHtml: string) => {
+        const t = title.trim();
+        if (!t || !stripHtml(bodyHtml)) return;
+        const { body, teaser, minutes } = deriveFromHtml(bodyHtml);
+        patch({
+          learnEntries: persistedRef.current.learnEntries.map((e) =>
+            e.id === id
+              ? { ...e, title: t, body, bodyHtml, teaser, len: `${minutes} dk`, stamp: `${e.date} · ${minutes} dk okuma` }
+              : e,
+          ),
+        });
+      },
+      removeLearnEntry: (id: string) => {
+        patch({ learnEntries: persistedRef.current.learnEntries.filter((e) => e.id !== id) });
       },
 
       topicOverrides: persisted.topicOverrides,

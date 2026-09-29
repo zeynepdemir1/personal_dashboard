@@ -117,8 +117,10 @@ bildirilir.
 ### Takvim (Ana Sayfa)
 Haftalık (saat bazlı, ders/etkinlik blokları) ve aylık (gün başına
 gösterge noktaları) iki görünümlü bir takvim — başlığın yanındaki ‹ ›
-oklarıyla önceki/sonraki haftaya ya da aya gidilebilir (varsayılan görünüm
-hâlâ demo verinin bulunduğu 2026 Eylül'ü). Google Calendar'daki gerçek
+oklarıyla önceki/sonraki haftaya ya da aya gidilebilir. Varsayılan görünüm
+gerçek "bugün"ün haftası/ayı (bkz. PLAN.md Aşama 25 madde 8 — eskiden
+sabit bir demo tarihine kilitliydi, artık sayfa her açıldığında tarayıcının
+gerçek anlık tarihine göre açılıyor). Google Calendar'daki gerçek
 etkinlikler salt-okunur olarak senkronize edilir ve yerel notlardan
 görsel olarak ayrılır (bkz.
 [Google Calendar salt-okunur kararı](#mimari-karar-2-google-calendar-salt-okunur)).
@@ -189,6 +191,17 @@ eklenen içerik ham/işlenmemiş durumda kalır ("özetlenmedi" / "filtrelenmedi
 uygulama daha sonra Ollama'nın erişilebilir olduğu bilgisayardan açıldığında,
 bekleyen tüm içerik arka planda otomatik olarak işlenir. Kullanıcıya hiçbir
 hata gösterilmez — bu davranış tamamen sessiz ve beklenen bir durumdur.
+
+**Ollama CORS ayarı (bkz. PLAN.md Aşama 25 madde 5):** tarayıcı, gerçek
+siteyi (zdemir.tech) kullanırken bile Ollama'ya Render üzerinden değil
+DOĞRUDAN (`http://localhost:11434`) bağlanıyor — Render'ın Ollama'yı hiç
+görememesi yapısal bir gerçek olduğu için tek çalışabilir yol bu. Bunun
+çalışması için Ollama'nın kendi `OLLAMA_ORIGINS` ayarının `https://zdemir.tech`
+origin'ine izin vermesi gerekiyor (verilmezse Ollama isteği kendisi
+reddeder). Elle başlatılıyorsa: `OLLAMA_ORIGINS=https://zdemir.tech ollama
+serve`; systemd servisiyse: `sudo systemctl edit ollama` ile
+`Environment="OLLAMA_ORIGINS=https://zdemir.tech"` ekleyip `sudo systemctl
+restart ollama`.
 
 ### Mimari Karar 2: Google Calendar salt-okunur
 Google Calendar entegrasyonu OAuth ile iki yönlü bir senkronizasyon değil,
@@ -289,11 +302,15 @@ Telegram/SerpApi için sunucu tarafı vekil (proxy) görevi görüyor.
 
 ## Sınırlamalar / Bilinen Kısıtlar
 
-- **Ollama sadece yerelde çalışır** — production sunucusunun (Render)
-  hiçbir şekilde erişemeyeceği bir servis. AI özellikleri (özetleme,
-  Program Keşfi profil filtresi) sadece Ollama'nın kurulu olduğu
-  bilgisayardan uygulama açıldığında işler; bekleyen içerik bir sonraki
-  o cihazdan açılışa kadar "işlenmemiş" kalır.
+- **Ollama sadece Ollama'nın kurulu olduğu bilgisayardan çalışır** —
+  production sunucusu (Render) Ollama'yı hiçbir şekilde göremez, ama
+  (bkz. PLAN.md Aşama 25 madde 5) tarayıcı artık `zdemir.tech`'i o
+  bilgisayardan açtığında Ollama'ya DOĞRUDAN bağlanıyor (Render'ı
+  atlayarak) — bunun için Ollama'nın `OLLAMA_ORIGINS` ayarının
+  `https://zdemir.tech`'e izin vermesi şart (bkz. yukarıdaki "Ollama CORS
+  ayarı"). Bu ayar yapılmadıysa (ya da başka bir cihazdan açıldıysa)
+  içerik "işlenmemiş" kalır, Ollama'nın erişilebilir olduğu bilgisayardan
+  bir sonraki açılışta otomatik işlenir.
 - **Render'ın ücretsiz planı boşta kalınca uyur** — bir süre trafik
   almayan servis "uykuya" geçer ve uyanırken kendi markalı bir ekran
   gösterir. Bunu tamamen ortadan kaldırmak için bir GitHub Actions

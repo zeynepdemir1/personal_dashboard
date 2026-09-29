@@ -33,7 +33,7 @@ export function Projects() {
             <span style={{ fontFamily: fonts.sans, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: p.stateColor }}>{p.state}</span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
               <span style={{ fontFamily: fonts.serif, fontSize: 19, color: colors.ink }}>{p.title}</span>
-              <span style={{ fontSize: 13, lineHeight: 1.6, color: colors.inkSoft }}>{p.note}</span>
+              <span style={{ fontSize: 14, lineHeight: 1.6, color: colors.inkSoft }}>{p.note}</span>
             </div>
             <span style={{ fontFamily: fonts.sans, fontSize: 11, color: colors.inkFaint, textAlign: 'right' }}>{p.date}</span>
           </div>
@@ -82,7 +82,7 @@ function ProjectDetail({ view }: { view: ReturnType<typeof buildProjectViews>[nu
     border: `1px solid ${colors.borderStrong}`,
     background: colors.panel,
     fontFamily: fonts.sans,
-    fontSize: 14,
+    fontSize: 15,
     color: colors.ink,
     outline: 'none',
     borderRadius: 3,
@@ -90,10 +90,22 @@ function ProjectDetail({ view }: { view: ReturnType<typeof buildProjectViews>[nu
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 30, maxWidth: '68ch' }}>
-      <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <span onClick={() => app.navigate('projects')} className="hover-underline" style={{ fontFamily: fonts.sans, fontSize: 11, color: colors.rose, cursor: 'pointer' }}>
           ← projelere dön
         </span>
+        {key.startsWith('extra:') && (
+          <span
+            onClick={() => {
+              app.removeExtraProject(key.slice(6));
+              app.navigate('projects');
+            }}
+            className="text-hover-red"
+            style={{ fontFamily: fonts.sans, fontSize: 11, color: colors.placeholderText, cursor: 'pointer' }}
+          >
+            Projeyi sil
+          </span>
+        )}
       </div>
 
       <header style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -155,7 +167,7 @@ function ProjectDetail({ view }: { view: ReturnType<typeof buildProjectViews>[nu
             >
               {c.done ? '✓' : ''}
             </span>
-            <span style={{ flex: 1, fontSize: 14, color: c.done ? colors.inkFaint : colors.ink, textDecoration: c.done ? 'line-through' : 'none' }}>
+            <span style={{ flex: 1, fontSize: 15, color: c.done ? colors.inkFaint : colors.ink, textDecoration: c.done ? 'line-through' : 'none' }}>
               {c.text}
             </span>
             <span onClick={() => app.removeProjectChecklistItem(key, c.id)} className="text-hover-red" style={{ fontSize: 11, color: colors.placeholderText, cursor: 'pointer' }}>
@@ -182,7 +194,7 @@ function ProjectDetail({ view }: { view: ReturnType<typeof buildProjectViews>[nu
               setQTask('');
             }}
             className="btn-dark"
-            style={{ padding: '9px 16px', fontSize: 13, cursor: 'pointer', borderRadius: 3, whiteSpace: 'nowrap' }}
+            style={{ padding: '9px 16px', fontSize: 14, cursor: 'pointer', borderRadius: 3, whiteSpace: 'nowrap' }}
           >
             Ekle
           </div>

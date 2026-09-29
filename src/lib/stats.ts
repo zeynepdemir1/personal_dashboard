@@ -1,7 +1,7 @@
 // Ana sayfadaki istatistik kartlarını gerçek veriden hesaplar (bkz. PLAN.md
 // Aşama 2). Sabit metin yerine MONTHS/TOPICS/TODAY tek kaynaklarından türetir.
 import { MONTHS, TOPICS } from './data';
-import { parseDotDate, referenceToday } from './dates';
+import { parseDotDate, referenceToday, MONTH_FULL_TR } from './dates';
 import type { TopicOverride } from './types';
 
 const MONTH_ABBR: Record<string, number> = {
@@ -68,7 +68,9 @@ export function computeHomeStats(extraGrowthNotesCount = 0): HomeStats {
   const daysSinceLastEntry = Math.round((referenceDate.getTime() - maxDate.getTime()) / 86400000);
 
   return {
-    currentMonthLabel: MONTHS[0]?.name.split(' ')[0] ?? '',
+    // PLAN.md Aşama 25 madde 3: MONTHS artık boş (örnek veri kaldırıldı) —
+    // yedek olarak referans "bugün"ün gerçek ay adı kullanılıyor.
+    currentMonthLabel: MONTHS[0]?.name.split(' ')[0] ?? MONTH_FULL_TR[referenceDate.getMonth()],
     currentMonthCount: (MONTHS[0]?.count ?? 0) + extraGrowthNotesCount,
     streakWeeks: computeStreakWeeks(dates),
     daysSinceLastEntry,

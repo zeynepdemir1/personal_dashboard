@@ -32,14 +32,10 @@ export function Discover() {
         <h1 style={{ margin: 0, fontFamily: fonts.serif, fontSize: 40, fontWeight: 400, letterSpacing: '-0.02em', color: colors.ink }}>
           Keşfedilen Programlar
         </h1>
-        <p style={{ margin: '10px 0 0', fontSize: 13.5, lineHeight: 1.6, color: colors.inkSoft, maxWidth: '60ch' }}>
-          Haftalık otomatik taramanın (SerpApi) bulup profilinle alakalı bulduğu sonuçlar —
-          son başvuru tarihi geçmiş olanlar burada otomatik olarak kalkar.
-        </p>
       </header>
 
       {app.discoveredPrograms.length === 0 && (
-        <div style={{ fontSize: 13.5, color: colors.inkFaint, fontStyle: 'italic' }}>
+        <div style={{ fontSize: 14.5, color: colors.inkFaint, fontStyle: 'italic' }}>
           Henüz yeni bir şey bulunamadı — periyodik tarama ve yerel modelin profil filtresi
           tamamlanınca burada listelenecek.
         </div>
@@ -89,7 +85,7 @@ function DiscoverCard({ program }: { program: DiscoveredProgram }) {
           <span style={{ fontFamily: fonts.sans, fontSize: 10, color: colors.rose, whiteSpace: 'nowrap' }}>{program.deadline}</span>
         )}
       </div>
-      <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: colors.inkSoft }}>
+      <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: colors.inkSoft }}>
         {program.description || program.snippet}
       </p>
       <div style={{ display: 'flex', gap: 14, marginTop: 4 }}>

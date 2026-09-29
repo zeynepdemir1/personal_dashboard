@@ -3,8 +3,6 @@ import { useApp } from '../../state/AppState';
 import { colors, fonts, pillStyle } from '../../lib/theme';
 import { LINKS, LINK_KINDS, TODAY } from '../../lib/data';
 
-const FILTERS = ['Tümü · 86', 'GitHub · 24', 'Ders notu · 19', 'Makale · 15', 'Araç · 12', 'Okunmadı · 8'];
-
 export function Links() {
   const app = useApp();
   const narrow = app.width < 1180;
@@ -17,7 +15,8 @@ export function Links() {
     border: `1px solid ${colors.borderStrong}`,
   };
 
-  const links = [...app.extraLinks, ...LINKS].map((l) => ({
+  const links = [...app.extraLinks, ...LINKS].map((l, i) => ({
+    id: i < app.extraLinks.length ? app.extraLinks[i].id : undefined,
     kind: l.kind || 'Link',
     kindColor: l.kindColor || colors.inkSoft,
     date: l.date || TODAY,
@@ -37,12 +36,19 @@ export function Links() {
       }),
   }));
 
+  // PLAN.md Aşama 25 madde 3: eskiden sabit/uydurma sayılardı ("Tümü · 86"
+  // gibi) — artık gerçek listeden hesaplanıyor.
+  const filters = [
+    { label: 'Tümü', count: links.length },
+    ...LINK_KINDS.map((k) => ({ label: k, count: links.filter((l) => l.kind === k).length })).filter((f) => f.count > 0),
+  ];
+
   const inputStyle: CSSProperties = {
     padding: '10px 12px',
     border: `1px solid ${colors.borderStrong}`,
     background: colors.panel,
     fontFamily: fonts.sans,
-    fontSize: 13,
+    fontSize: 14,
     color: colors.ink,
     outline: 'none',
     borderRadius: 3,
@@ -58,7 +64,7 @@ export function Links() {
           <div
             onClick={app.startAddLinkForm}
             className="btn-outline-invert"
-            style={{ padding: '11px 18px', border: `1px solid ${colors.inkSoft}`, color: colors.inkSoft, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', borderRadius: 3 }}
+            style={{ padding: '11px 18px', border: `1px solid ${colors.inkSoft}`, color: colors.inkSoft, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap', borderRadius: 3 }}
           >
             Link yapıştır
           </div>
@@ -110,11 +116,11 @@ export function Links() {
             <div
               onClick={app.cancelAddLinkForm}
               className="btn-outline-hover"
-              style={{ padding: '9px 16px', border: `1px solid ${colors.borderStrong}`, color: colors.inkSoft, fontSize: 13, cursor: 'pointer', borderRadius: 3 }}
+              style={{ padding: '9px 16px', border: `1px solid ${colors.borderStrong}`, color: colors.inkSoft, fontSize: 14, cursor: 'pointer', borderRadius: 3 }}
             >
               Vazgeç
             </div>
-            <div onClick={app.saveLinkForm} className="btn-dark" style={{ padding: '9px 16px', fontSize: 13, cursor: 'pointer', borderRadius: 3 }}>
+            <div onClick={app.saveLinkForm} className="btn-dark" style={{ padding: '9px 16px', fontSize: 14, cursor: 'pointer', borderRadius: 3 }}>
               Kaydet
             </div>
           </div>
@@ -122,9 +128,9 @@ export function Links() {
       )}
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', borderTop: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}`, padding: '12px 0', flexWrap: 'wrap' }}>
-        {FILTERS.map((f, i) => (
-          <div key={f} className="hover-row" style={pillStyle(i === 0)}>
-            {f}
+        {filters.map((f, i) => (
+          <div key={f.label} className="hover-row" style={pillStyle(i === 0)}>
+            {f.label} · {f.count}
           </div>
         ))}
       </div>
@@ -134,11 +140,30 @@ export function Links() {
           <div key={i} onClick={l.open} className="hover-row-alt" style={{ background: colors.panel, padding: '24px 24px 22px', display: 'flex', flexDirection: 'column', gap: 11, cursor: 'pointer' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               <span style={{ fontFamily: fonts.sans, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', color: l.kindColor }}>{l.kind}</span>
-              <span style={{ fontFamily: fonts.sans, fontSize: 10, color: colors.inkFaint }}>{l.date}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontFamily: fonts.sans, fontSize: 10, color: colors.inkFaint }}>{l.date}</span>
+                {l.id && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      app.removeExtraLink(l.id!);
+                    }}
+                    className="text-hover-red"
+                    title="Linki sil"
+                    style={{ cursor: 'pointer', color: colors.placeholderText }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 6h18" />
+                      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    </svg>
+                  </span>
+                )}
+              </div>
             </div>
             <div style={{ fontFamily: fonts.serif, fontSize: 20, lineHeight: 1.3, color: colors.ink }}>{l.title}</div>
             <div style={{ fontFamily: fonts.sans, fontSize: 11, color: colors.inkFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.url}</div>
-            <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: colors.inkSoft, textWrap: 'pretty' }}>{l.note}</p>
+            <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.6, color: colors.inkSoft, textWrap: 'pretty' }}>{l.note}</p>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
               {l.tags.map((t) => (
                 <span key={t} style={{ fontFamily: fonts.sans, fontSize: 10, padding: '3px 7px', border: `1px solid ${colors.borderStrong}`, color: colors.inkSoft }}>

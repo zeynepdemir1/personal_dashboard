@@ -120,7 +120,7 @@ export function DayPanel() {
                       padding: '7px 9px',
                       border: `1px solid ${colors.borderStrong}`,
                       borderRadius: 4,
-                      fontSize: 13,
+                      fontSize: 14,
                       color: colors.ink,
                       fontFamily: fonts.sans,
                       outline: 'none',
@@ -156,7 +156,7 @@ export function DayPanel() {
                 <span style={{ fontFamily: fonts.sans, fontSize: 11, color: colors.inkFainter, flex: '0 0 40px' }}>
                   {it.time || 'not'}
                 </span>
-                <span style={{ fontSize: 13.5, color: colors.ink, lineHeight: 1.4, flex: 1 }}>{it.label}</span>
+                <span style={{ fontSize: 14.5, color: colors.ink, lineHeight: 1.4, flex: 1 }}>{it.label}</span>
                 <span
                   onClick={() => startEdit(it.id, it.time, it.label)}
                   className="text-hover-rose"
@@ -199,7 +199,7 @@ export function DayPanel() {
               <span style={{ fontFamily: fonts.sans, fontSize: 11, color: colors.inkFainter, flex: '0 0 40px' }}>
                 {formatEventTime(ev)}
               </span>
-              <span style={{ fontSize: 13.5, color: colors.ink, lineHeight: 1.4, flex: 1 }}>{ev.title}</span>
+              <span style={{ fontSize: 14.5, color: colors.ink, lineHeight: 1.4, flex: 1 }}>{ev.title}</span>
               <span style={{ fontFamily: fonts.sans, fontSize: 9, letterSpacing: '0.04em', textTransform: 'uppercase', color: colors.steel, flex: '0 0 auto' }}>
                 Google
               </span>
@@ -223,7 +223,7 @@ export function DayPanel() {
               title="Program Takvimi'nde düzenle"
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 13.5, color: colors.ink, lineHeight: 1.4, flex: 1, fontWeight: 500 }}>{p.title}</span>
+                <span style={{ fontSize: 14.5, color: colors.ink, lineHeight: 1.4, flex: 1, fontWeight: 500 }}>{p.title}</span>
                 <span style={{ fontFamily: fonts.sans, fontSize: 9, letterSpacing: '0.04em', textTransform: 'uppercase', color: colors.rose, flex: '0 0 auto' }}>
                   Program
                 </span>
@@ -233,7 +233,7 @@ export function DayPanel() {
             </div>
           ))}
           {items.length === 0 && gcalItems.length === 0 && programItems.length === 0 && (
-            <div style={{ fontSize: 13, color: colors.inkFaint, fontStyle: 'italic' }}>
+            <div style={{ fontSize: 14, color: colors.inkFaint, fontStyle: 'italic' }}>
               Bu güne henüz bir şey eklenmedi.
             </div>
           )}
@@ -279,7 +279,7 @@ export function DayPanel() {
               padding: '10px 12px',
               border: `1px solid ${colors.borderStrong}`,
               borderRadius: 4,
-              fontSize: 13,
+              fontSize: 14,
               color: colors.ink,
               fontFamily: fonts.sans,
               outline: 'none',
@@ -291,7 +291,7 @@ export function DayPanel() {
             style={{
               padding: '10px 0',
               textAlign: 'center',
-              fontSize: 13,
+              fontSize: 14,
               cursor: 'pointer',
               borderRadius: 4,
             }}

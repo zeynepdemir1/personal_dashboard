@@ -177,7 +177,7 @@ export function CalendarScreen() {
                 <span style={{ fontFamily: fonts.sans, fontSize: 11.5, color: colors.ink }}>{p.date}</span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   <span style={{ fontFamily: fonts.serif, fontSize: 19, color: colors.ink }}>{p.title}</span>
-                  <span style={{ fontSize: 13, lineHeight: 1.6, color: colors.inkSoft }}>{p.baseNote}</span>
+                  <span style={{ fontSize: 14, lineHeight: 1.6, color: colors.inkSoft }}>{p.baseNote}</span>
                   {((!isExtra && p.note) || p.link || p.fileName) && (
                     <span style={{ fontSize: 11, color: colors.rose }}>
                       {[!isExtra && p.note && '📝 not', p.link && '🔗 link', p.fileName && '📎 dosya'].filter(Boolean).join(' · ')}
@@ -247,7 +247,7 @@ export function CalendarScreen() {
                     <span style={{ fontSize: 10.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.inkFaint }}>Dosya (ör. şartname PDF'i)</span>
                     {p.fileName ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <a href={p.fileData} download={p.fileName} style={{ fontSize: 13, color: colors.rose }}>
+                        <a href={p.fileData} download={p.fileName} style={{ fontSize: 14, color: colors.rose }}>
                           {p.fileName}
                         </a>
                         <span onClick={() => removeFile(p)} className="text-hover-red" style={{ cursor: 'pointer', fontSize: 11, color: colors.placeholderText }}>

@@ -1,15 +1,29 @@
-// Ollama'nın yerel HTTP API'sine (varsayılan http://localhost:11434)
-// erişim. Google Calendar entegrasyonuyla aynı sebeple (CORS) doğrudan
-// değil, bir proxy üzerinden gidiyoruz — geliştirmede Vite dev-proxy
-// (bkz. vite.config.ts, /api/ollama), production'da server.js (bkz.
-// PLAN.md Aşama 13). Production'da bu proxy KASITLI olarak yok — Ollama
-// yalnızca Zeynep'in kendi bilgisayarında çalıştığı için bu özellik
-// doğası gereği hep yerel kalacak; production'daki istekler server.js'in
-// /api/* için döndürdüğü gerçek 404'e düşer, aşağıdaki kontrol bunu
-// düzgün şekilde "bağlı değil" olarak yorumlar (hata fırlatmaz).
 import { useEffect, useState } from 'react';
 
-const BASE = '/api/ollama';
+// Ollama'nın yerel HTTP API'sine (varsayılan http://localhost:11434)
+// erişim.
+//
+// PLAN.md Aşama 25 madde 5 — kök neden bulundu ve düzeltildi: yerel
+// geliştirmede (`npm run dev`) Vite'ın kendi proxy'si (vite.config.ts,
+// /api/ollama) üzerinden gidiliyordu; ESKİDEN production'da da AYNI
+// göreli `/api/ollama` yolu kullanılıyordu — ama server.js bu yolu
+// KASITLI 404'lüyor (Ollama Render'ın sunucusundan hiç görünmüyor,
+// sadece Zeynep'in kendi bilgisayarından). Sonuç: Zeynep GERÇEK siteyi
+// (zdemir.tech) Ollama'nın çalıştığı bilgisayardan açsa bile, tarayıcı
+// isteği zdemir.tech'in kendi sunucusuna (Render) gidiyordu, hiçbir
+// zaman tarayıcının kendi makinesindeki Ollama'ya ulaşmıyordu — bu
+// davranış Aşama 13'ten beri hep böyleydi (Aşama 20'nin bir regresyonu
+// DEĞİL, ama gerçek kök neden buydu).
+//
+// Düzeltme: production build'de tarayıcı artık `http://localhost:11434`'e
+// DOĞRUDAN istek atıyor (Render üzerinden değil) — bu, sadece tarayıcının
+// çalıştığı makinede gerçekten bir Ollama varsa başarılı olur (Zeynep'in
+// senaryosu tam olarak bu). HTTPS bir sayfadan http://localhost'a istek
+// atmak tarayıcılarda (Chrome 94+) mixed-content olarak engellenmiyor —
+// localhost için özel bir istisna var. TEK GEREKEN: Ollama'nın kendi CORS
+// ayarı (OLLAMA_ORIGINS) zdemir.tech'e izin vermeli, yoksa Ollama isteği
+// kendisi reddeder (bkz. README "Ollama CORS" notu).
+const BASE = import.meta.env.DEV ? '/api/ollama' : 'http://localhost:11434';
 const MODEL = 'llama3.1:8b';
 
 export interface OllamaStatus {

@@ -7,6 +7,8 @@ import { compressImage } from '../lib/image';
 import { uploadImage } from '../lib/upload';
 import { BackgroundAccent } from './BackgroundAccent';
 import type { Screen } from '../lib/types';
+import { MONTHS, LINKS, PROJECTS, PROGRAMS, TOPICS } from '../lib/data';
+import { SEED_LEARN_ENTRIES } from '../lib/learn';
 
 const ACADEMIC: { key: Screen; label: string }[] = [
   { key: 'growth', label: 'Akademik Gelişim' },
@@ -29,13 +31,19 @@ export function Sidebar() {
   const tight = app.width < 860;
   const ollama = useOllamaStatus();
 
+  // PLAN.md Aşama 25 madde 3: eskiden sabit/uydurma sayılardı (ör. Akademik
+  // Gelişim hep '42' gösteriyordu, diğerleri de gerçek eklemenin üstüne
+  // sahte bir seed sayısı ekliyordu — ör. "31 + gerçek giriş sayısı").
+  // Artık hepsi gerçek verilerden (seed dizileri artık boş olduğu için
+  // fiilen sadece gerçek kullanıcı verisinden) hesaplanıyor.
+  const growthNoteCount = MONTHS.reduce((sum, m) => sum + m.count, 0) + app.extraGrowthNotes.length;
   const counts: Record<string, string> = {
-    growth: '42',
-    learn: String(31 + app.learnEntries.length),
-    links: String(86 + app.extraLinks.length),
-    projects: String(12 + app.extraProjects.length),
-    calendar: String(7 + app.extraPrograms.length),
-    topics: String(23 + app.extraTopics.length),
+    growth: String(growthNoteCount),
+    learn: String(SEED_LEARN_ENTRIES.length + app.learnEntries.length),
+    links: String(LINKS.length + app.extraLinks.length),
+    projects: String(PROJECTS.length + app.extraProjects.length),
+    calendar: String(PROGRAMS.length + app.extraPrograms.length),
+    topics: String(TOPICS.length + app.extraTopics.length),
     discover: String(app.discoveredPrograms.length),
     diary: '·',
     poems: String(app.poemEntries.length),
@@ -274,7 +282,7 @@ export function Sidebar() {
               {ollama.label}
             </div>
           </div>
-          <span style={{ marginLeft: 'auto', fontSize: 13, color: colors.inkFaint }}>⋯</span>
+          <span style={{ marginLeft: 'auto', fontSize: 14, color: colors.inkFaint }}>⋯</span>
         </div>
 
         {app.profileOpen && !app.editingProfile && (

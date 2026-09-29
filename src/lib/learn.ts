@@ -116,7 +116,10 @@ export function stripHtml(html: string): string {
   return (el.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-export function makeLearnEntry(title: string, bodyHtml: string): LearnEntry {
+// makeLearnEntry (yeni giriş) ile updateLearnEntry'nin (Aşama 25 madde 4,
+// AppState.tsx) türetilmiş alan hesabı (kelime sayısı/okuma süresi/
+// paragraf/teaser) ortak — ikisi de bu fonksiyonu kullanıyor.
+export function deriveFromHtml(bodyHtml: string): { body: string[]; teaser: string; minutes: number } {
   const plainText = stripHtml(bodyHtml);
   const words = plainText.split(/\s+/).filter(Boolean).length;
   const minutes = Math.max(1, Math.round(words / 180));
@@ -126,6 +129,11 @@ export function makeLearnEntry(title: string, bodyHtml: string): LearnEntry {
     .filter(Boolean);
   const body = paragraphs.length ? paragraphs : [plainText];
   const teaser = body[0].length > 200 ? `${body[0].slice(0, 197)}…` : body[0];
+  return { body, teaser, minutes };
+}
+
+export function makeLearnEntry(title: string, bodyHtml: string): LearnEntry {
+  const { body, teaser, minutes } = deriveFromHtml(bodyHtml);
 
   return {
     id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,

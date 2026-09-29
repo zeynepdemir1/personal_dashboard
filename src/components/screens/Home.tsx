@@ -32,13 +32,6 @@ const HOUR_LABELS = [
 
 const WEEKDAY_LABELS = ['PZT', 'SAL', 'ÇAR', 'PER', 'CUM', 'CMT', 'PAZ'];
 
-// PLAN.md Aşama 22: takvim artık sabit bir pencereye kilitli değil, oklarla
-// gezilebiliyor — varsayılan "çapa" (anchor) tarih, önceki sabit pencereyle
-// AYNI görünümü verecek şekilde seçildi: 1 Eylül 2026 Salı günü — o haftanın
-// (Pazartesi başlangıçlı) Pazartesi'si 31 Ağustos, yani hafta görünümü
-// eskisiyle birebir aynı; ay görünümü de Eylül 2026'yı gösteriyor (eskisiyle
-// aynı varsayılan).
-const DEFAULT_ANCHOR = new Date(2026, 8, 1);
 
 export function Home() {
   const app = useApp();
@@ -79,7 +72,7 @@ export function Home() {
       sub: 'Akademik Gelişim’e bu ay eklenen kayıt sayısı',
     },
     { value: String(homeStats.streakWeeks), label: 'Kesintisiz kayıt', sub: 'Art arda en az bir kayıt eklenen hafta sayısı' },
-    { value: `${closedTopicsThisMonth}/${totalTopics}`, label: 'Kapanan merak konusu', sub: 'Bu ay tamamlananlar' },
+    { value: `${closedTopicsThisMonth}/${totalTopics}`, label: 'Kapanan araştırma konusu', sub: 'Bu ay tamamlananlar' },
     { value: `${homeStats.daysSinceLastEntry} gün`, label: 'Son girişten bu yana', sub: '' },
   ];
 
@@ -120,21 +113,22 @@ export function Home() {
   const allTopics = TOPICS.map((t, i) => {
     const ov = app.topicOverrides[i];
     const done = ov ? ov.done : !!t.done;
-    return { title: t.title, image: undefined as string | undefined, i, done };
+    return { title: t.title, image: undefined as string | undefined, done, toggle: () => app.toggleTopicAt(i), remove: undefined as (() => void) | undefined };
   });
-  const extraTopicsList = app.extraTopics.map((t, j) => ({
-    title: t.title,
-    image: t.image,
-    i: `extra${j}` as unknown as number,
-    done: false,
-  }));
-  const openTopics = [...extraTopicsList, ...allTopics.filter((t) => !t.done)]
-    .slice(0, 6)
+  // PLAN.md Aşama 25 madde 2 düzeltmesi: eklenen konular eskiden `i` alanı
+  // bir string ("extra0") olduğu için toggle hiçbir şey yapmıyordu (tip
+  // kontrolü `typeof t.i === 'number'` hep false dönüyordu) — artık
+  // gerçek id'leriyle app.toggleExtraTopic/removeExtraTopic'e bağlı.
+  const extraTopicsList = app.extraTopics
+    .filter((t) => !t.done)
     .map((t) => ({
       title: t.title,
       image: t.image,
-      toggle: typeof t.i === 'number' ? () => app.toggleTopicAt(t.i as number) : () => {},
+      done: t.done,
+      toggle: () => app.toggleExtraTopic(t.id),
+      remove: () => app.removeExtraTopic(t.id),
     }));
+  const openTopics = [...extraTopicsList, ...allTopics.filter((t) => !t.done)].slice(0, 6);
 
   const homeLinks = [...app.extraLinks, ...LINKS].slice(0, 3).map((l) => ({
     title: l.title,
@@ -163,7 +157,15 @@ export function Home() {
   // haftayı, ay görünümü çapanın ayını gösteriyor. Sekmeler arası geçişte
   // (Haftalık ↔ Aylık) bilerek SIFIRLANMIYOR, ör. Ekim'e gidip Aylık'tan
   // Haftalık'a geçersen Ekim'in bir haftasını görürsün.
-  const [anchorDate, setAnchorDate] = useState(() => DEFAULT_ANCHOR);
+  //
+  // PLAN.md Aşama 25 madde 8 düzeltmesi: varsayılan çapa eskiden sabit bir
+  // tarihe (eski demo verisinin bulunduğu hafta) kilitliydi — sayfa HER
+  // AÇILDIĞINDA aynı sabit haftayı gösteriyordu, bugünün gerçek tarihine
+  // hiç bakmıyordu. Artık gerçek `new Date()` (tarayıcının GERÇEK anlık
+  // tarihi — uygulamanın geri kalanındaki dondurulmuş `TODAY` demo
+  // sabitinden BİLEREK farklı, bkz. Aşama 15) kullanılıyor; sayfa her
+  // açıldığında gerçekten o haftayı/ayı gösteriyor.
+  const [anchorDate, setAnchorDate] = useState(() => new Date());
   const goPrevPeriod = () => setAnchorDate((d) => (app.calView === 'week' ? addDays(d, -7) : addMonths(d, -1)));
   const goNextPeriod = () => setAnchorDate((d) => (app.calView === 'week' ? addDays(d, 7) : addMonths(d, 1)));
   const periodLabel =
@@ -246,7 +248,7 @@ export function Home() {
                 <span style={{ fontFamily: fonts.sans, fontSize: 11, color: colors.inkFainter, flex: '0 0 60px' }}>{r.date}</span>
                 <span style={{ fontFamily: fonts.serif, fontSize: 18, lineHeight: 1.3, color: colors.ink }}>{r.title}</span>
               </div>
-              <div style={{ paddingLeft: 72, fontSize: 13, lineHeight: 1.6, color: colors.inkSoft, textWrap: 'pretty' }}>{r.summary}</div>
+              <div style={{ paddingLeft: 72, fontSize: 14, lineHeight: 1.6, color: colors.inkSoft, textWrap: 'pretty' }}>{r.summary}</div>
             </div>
           ))}
         </div>
@@ -265,7 +267,7 @@ export function Home() {
                 <div style={{ fontFamily: fonts.serif, fontSize: 20, lineHeight: 1.1, color: colors.ink }}>{u.day}</div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 2, flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: colors.ink }}>{u.title}</div>
+                <div style={{ fontSize: 15, fontWeight: 500, color: colors.ink }}>{u.title}</div>
                 <div style={{ fontSize: 12, color: colors.inkSoft, lineHeight: 1.5 }}>{u.note}</div>
                 <div style={{ fontFamily: fonts.sans, fontSize: 10, color: u.color, letterSpacing: '0.06em' }}>{u.left}</div>
               </div>
@@ -291,27 +293,27 @@ export function Home() {
                   value={app.qProgram}
                   onChange={(e) => app.setQProgram(e.target.value)}
                   placeholder="Program adı…"
-                  style={{ flex: 1, padding: '9px 11px', border: `1px solid ${colors.borderStrong}`, background: colors.panel, fontSize: 13, color: colors.ink, outline: 'none', borderRadius: 3 }}
+                  style={{ flex: 1, padding: '9px 11px', border: `1px solid ${colors.borderStrong}`, background: colors.panel, fontSize: 14, color: colors.ink, outline: 'none', borderRadius: 3 }}
                 />
                 <input
                   type="date"
                   value={app.qProgramDate}
                   onChange={(e) => app.setQProgramDate(e.target.value)}
-                  style={{ flex: '0 0 152px', padding: '9px 11px', border: `1px solid ${colors.borderStrong}`, background: colors.panel, fontSize: 13, color: colors.ink, outline: 'none', borderRadius: 3 }}
+                  style={{ flex: '0 0 152px', padding: '9px 11px', border: `1px solid ${colors.borderStrong}`, background: colors.panel, fontSize: 14, color: colors.ink, outline: 'none', borderRadius: 3 }}
                 />
               </div>
               <textarea
                 value={app.qProgramNote}
                 onChange={(e) => app.setQProgramNote(e.target.value)}
                 placeholder="Not (opsiyonel)…"
-                style={{ padding: '9px 11px', border: `1px solid ${colors.borderStrong}`, background: colors.panel, fontSize: 13, color: colors.ink, outline: 'none', borderRadius: 3, minHeight: 44, resize: 'vertical' }}
+                style={{ padding: '9px 11px', border: `1px solid ${colors.borderStrong}`, background: colors.panel, fontSize: 14, color: colors.ink, outline: 'none', borderRadius: 3, minHeight: 44, resize: 'vertical' }}
               />
               <div style={{ display: 'flex', gap: 8 }}>
                 <input
                   value={app.qProgramLink}
                   onChange={(e) => app.setQProgramLink(e.target.value)}
                   placeholder="Link (opsiyonel)…"
-                  style={{ flex: 1, padding: '9px 11px', border: `1px solid ${colors.borderStrong}`, background: colors.panel, fontSize: 13, color: colors.ink, outline: 'none', borderRadius: 3 }}
+                  style={{ flex: 1, padding: '9px 11px', border: `1px solid ${colors.borderStrong}`, background: colors.panel, fontSize: 14, color: colors.ink, outline: 'none', borderRadius: 3 }}
                 />
                 <div onClick={app.saveProgram} className="btn-dark" style={{ padding: '9px 14px', fontSize: 12.5, cursor: 'pointer', borderRadius: 3, whiteSpace: 'nowrap' }}>
                   Ekle
@@ -329,7 +331,7 @@ export function Home() {
           <h2 style={{ margin: 0, fontFamily: fonts.serif, fontSize: 17, fontWeight: 500, color: colors.ink }}>Linkler</h2>
           {homeLinks.map((l, i) => (
             <div key={i} onClick={l.open} className="hover-row" style={{ display: 'flex', flexDirection: 'column', gap: 2, cursor: 'pointer', padding: '6px 8px', margin: '0 -8px', borderRadius: 3 }}>
-              <span style={{ fontSize: 13, color: colors.ink, lineHeight: 1.35 }}>{l.title}</span>
+              <span style={{ fontSize: 14, color: colors.ink, lineHeight: 1.35 }}>{l.title}</span>
               <span style={{ fontFamily: fonts.sans, fontSize: 10, color: colors.inkFainter }}>{l.kind}</span>
             </div>
           ))}
@@ -347,10 +349,13 @@ export function Home() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, border: `1px solid ${colors.border}`, background: colors.panel, padding: '20px 20px 18px', borderRadius: 4 }}>
-          <h2 style={{ margin: 0, fontFamily: fonts.serif, fontSize: 17, fontWeight: 500, color: colors.ink }}>Merak konuları</h2>
+          <h2 style={{ margin: 0, fontFamily: fonts.serif, fontSize: 17, fontWeight: 500, color: colors.ink }}>Araştırılacak Konular</h2>
           {openTopics.map((t, i) => (
-            <div key={i} onClick={t.toggle} className="hover-row" style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13.5, color: colors.ink, cursor: 'pointer', padding: '3px 6px', margin: '0 -6px', borderRadius: 3 }}>
-              <span style={{ width: 14, height: 14, border: `1px solid ${colors.placeholderText}`, borderRadius: 3, flex: '0 0 14px', alignSelf: 'flex-start', marginTop: 3 }} />
+            <div key={i} className="hover-row" style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 14.5, color: colors.ink, padding: '3px 6px', margin: '0 -6px', borderRadius: 3 }}>
+              <span
+                onClick={t.toggle}
+                style={{ width: 14, height: 14, border: `1px solid ${colors.placeholderText}`, borderRadius: 3, flex: '0 0 14px', alignSelf: 'flex-start', marginTop: 3, cursor: 'pointer' }}
+              />
               {t.image && (
                 <img
                   src={t.image}
@@ -358,14 +363,28 @@ export function Home() {
                   style={{ width: 24, height: 24, flex: '0 0 24px', borderRadius: 3, objectFit: 'cover' }}
                 />
               )}
-              <span style={{ lineHeight: 1.5 }}>{t.title}</span>
+              <span onClick={t.toggle} style={{ lineHeight: 1.5, cursor: 'pointer', flex: 1 }}>{t.title}</span>
+              {t.remove && (
+                <span
+                  onClick={t.remove}
+                  className="text-hover-red"
+                  title="Konuyu sil"
+                  style={{ cursor: 'pointer', color: colors.placeholderText, flex: '0 0 auto', padding: 2 }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  </svg>
+                </span>
+              )}
             </div>
           ))}
           <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
             <input
               value={app.qTopic}
               onChange={(e) => app.setQTopic(e.target.value)}
-              placeholder="Yeni merak konusu…"
+              placeholder="Yeni araştırılacak konu…"
               style={{ flex: 1, padding: '8px 10px', border: `1px solid ${colors.borderStrong}`, background: '#FFFFFF', fontSize: 12.5, color: colors.ink, outline: 'none', borderRadius: 3 }}
             />
             <input ref={topicFileRef} type="file" accept="image/*" hidden onChange={handleTopicPhoto} />
@@ -405,7 +424,7 @@ export function Home() {
                 />
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span style={{ fontSize: 13, color: colors.ink, lineHeight: 1.4 }}>{p.title}</span>
+                <span style={{ fontSize: 14, color: colors.ink, lineHeight: 1.4 }}>{p.title}</span>
                 <span style={{ fontFamily: fonts.sans, fontSize: 10, color: p.stateColor }}>{p.state}</span>
               </div>
             </div>
@@ -462,7 +481,7 @@ export function Home() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 13,
+                  fontSize: 14,
                   color: colors.inkSoft,
                 }}
               >
@@ -484,7 +503,7 @@ export function Home() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 13,
+                  fontSize: 14,
                   color: colors.inkSoft,
                 }}
               >
@@ -556,7 +575,7 @@ function DiscoveredProgramsWidget() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span
               onClick={() => clampedPage > 0 && setPage(clampedPage - 1)}
-              style={{ fontSize: 13, color: clampedPage > 0 ? colors.inkSoft : colors.borderStrong, cursor: clampedPage > 0 ? 'pointer' : 'default' }}
+              style={{ fontSize: 14, color: clampedPage > 0 ? colors.inkSoft : colors.borderStrong, cursor: clampedPage > 0 ? 'pointer' : 'default' }}
             >
               ‹
             </span>
@@ -565,7 +584,7 @@ function DiscoveredProgramsWidget() {
             </span>
             <span
               onClick={() => clampedPage < totalPages - 1 && setPage(clampedPage + 1)}
-              style={{ fontSize: 13, color: clampedPage < totalPages - 1 ? colors.inkSoft : colors.borderStrong, cursor: clampedPage < totalPages - 1 ? 'pointer' : 'default' }}
+              style={{ fontSize: 14, color: clampedPage < totalPages - 1 ? colors.inkSoft : colors.borderStrong, cursor: clampedPage < totalPages - 1 ? 'pointer' : 'default' }}
             >
               ›
             </span>
@@ -581,7 +600,7 @@ function DiscoveredProgramsWidget() {
         pageItems.map((p) => (
           <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingBottom: 10, borderBottom: '1px solid #F1E4E4' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-              <a href={p.link.startsWith('http') ? p.link : `https://${p.link}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13.5, lineHeight: 1.4 }}>
+              <a href={p.link.startsWith('http') ? p.link : `https://${p.link}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 14.5, lineHeight: 1.4 }}>
                 {p.title}
               </a>
               {p.deadline && (

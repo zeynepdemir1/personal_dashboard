@@ -24,6 +24,7 @@ export const VALID_SCREENS: Screen[] = [
 ];
 
 export interface ExtraLink {
+  id: string;
   title: string;
   kind: string;
   kindColor?: string;
@@ -62,8 +63,12 @@ export interface ProjectOverride {
 }
 
 export interface ExtraTopic {
+  id: string;
   title: string;
   image?: string;
+  addedDate: string;
+  done: boolean;
+  doneDate: string;
 }
 
 export interface TopicOverride {

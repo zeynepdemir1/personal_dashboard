@@ -3,6 +3,7 @@ import { useApp } from '../../state/AppState';
 import { colors, fonts, pillStyle } from '../../lib/theme';
 import { MONTHS } from '../../lib/data';
 import { SEED_LEARN_ENTRIES } from '../../lib/learn';
+import { referenceToday, MONTH_FULL_TR } from '../../lib/dates';
 
 export function Growth() {
   const app = useApp();
@@ -16,10 +17,30 @@ export function Growth() {
 
   const learnEntries = [...app.learnEntries, ...SEED_LEARN_ENTRIES];
 
-  const months = MONTHS.map((m, mi) => {
-    // İlk ay (Ağustos) "bu ay" — Bir Şey Öğrendim'e yeni bir giriş
-    // kaydedilip yerel modelle özetlendiğinde buraya gerçek bir not
-    // olarak ekleniyor (bkz. PLAN.md Aşama 10, AppState.saveLearnEntry).
+  // PLAN.md Aşama 25 madde 3: MONTHS artık boş (örnek veri kaldırıldı).
+  // "Bu ay" kartı eskiden hep MONTHS[0]'a (Ağustos seed'i) gömülü
+  // extraGrowthNotes'u gösteriyordu — MONTHS boşken bu notların
+  // gösterileceği hiçbir yer kalmazdı. Bunun yerine, MONTHS boşsa gerçek
+  // referans tarihinden türetilen bir "bu ay" kartı senteziyoruz; hiç not
+  // yoksa da boş bir kart olarak (0 not) gösteriliyor, aşağıdaki liste
+  // boş kalıyor ama sayfa çökmüyor.
+  const sourceMonths =
+    MONTHS.length > 0
+      ? MONTHS
+      : [
+          {
+            name: `${MONTH_FULL_TR[referenceToday().getMonth()]} ${referenceToday().getFullYear()}`,
+            count: 0,
+            summary: '',
+            tags: [] as string[],
+            notes: [] as { date: string; title: string; body: string; source: string; dot: string; link: string }[],
+          },
+        ];
+
+  const months = sourceMonths.map((m, mi) => {
+    // İlk ay (bu ay) — Bir Şey Öğrendim'e yeni bir giriş kaydedilip yerel
+    // modelle özetlendiğinde buraya gerçek bir not olarak ekleniyor (bkz.
+    // PLAN.md Aşama 10, AppState.saveLearnEntry).
     const extraNotes = mi === 0 ? app.extraGrowthNotes : [];
     const allNotes = [...extraNotes, ...m.notes];
     return {
@@ -37,6 +58,8 @@ export function Growth() {
     };
   });
 
+  const totalNotes = months.reduce((sum, m) => sum + m.count, 0);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 46 }}>
       <header>
@@ -51,10 +74,17 @@ export function Growth() {
             {f}
           </div>
         ))}
-        <div style={{ marginLeft: 'auto', fontFamily: fonts.sans, fontSize: 11, color: colors.inkSoft, whiteSpace: 'nowrap' }}>42 not · 9 ay</div>
+        <div style={{ marginLeft: 'auto', fontFamily: fonts.sans, fontSize: 11, color: colors.inkSoft, whiteSpace: 'nowrap' }}>
+          {totalNotes} not · {MONTHS.length > 0 ? months.length : totalNotes > 0 ? 1 : 0} ay
+        </div>
       </div>
 
-      {months.map((m) => (
+      {totalNotes === 0 ? (
+        <div style={{ fontSize: 14, color: colors.inkFaint, fontStyle: 'italic' }}>
+          Henüz bir gelişim notu yok — "Bir Şey Öğrendim"e bir giriş eklediğinde (Ollama'nın özetiyle) burada görünecek.
+        </div>
+      ) : (
+        months.map((m) => (
         <section key={m.name} style={gridGrowth}>
           {/* Sticky sadece masaüstündeki iki sütunlu düzende anlamlı (kart
               sol sütunda sabit kalırken sağdaki uzun not listesi kayar).
@@ -95,14 +125,15 @@ export function Growth() {
                 <div style={{ flex: '0 0 74px', fontFamily: fonts.sans, fontSize: 11, color: colors.inkFainter, paddingTop: 3 }}>{n.date}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
                   <div style={{ fontFamily: fonts.serif, fontSize: 18.5, lineHeight: 1.35, color: colors.ink }}>{n.title}</div>
-                  <div style={{ fontSize: 13.5, lineHeight: 1.65, color: colors.inkSoft, textWrap: 'pretty' }}>{n.body}</div>
+                  <div style={{ fontSize: 14.5, lineHeight: 1.65, color: colors.inkSoft, textWrap: 'pretty' }}>{n.body}</div>
                   <span style={{ fontFamily: fonts.sans, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: colors.inkFainter }}>{n.source}</span>
                 </div>
               </div>
             ))}
           </div>
         </section>
-      ))}
+        ))
+      )}
     </div>
   );
 }

@@ -51,7 +51,7 @@ export function Diary() {
     border: `1px solid ${colors.borderStrong}`,
     background: colors.panel,
     fontFamily: fonts.sans,
-    fontSize: 14,
+    fontSize: 15,
     letterSpacing: '0.2em',
     textAlign: 'center',
     outline: 'none',
@@ -87,7 +87,7 @@ export function Diary() {
           {firstTimeSetup ? 'Günlük parolası belirle' : 'Günlük kilitli'}
         </h1>
         {firstTimeSetup && (
-          <p style={{ margin: 0, maxWidth: 320, fontSize: 13, lineHeight: 1.6, color: colors.inkSoft }}>
+          <p style={{ margin: 0, maxWidth: 320, fontSize: 14, lineHeight: 1.6, color: colors.inkSoft }}>
             Bu parola günlük girişlerini şifrelemek için kullanılacak — site parolandan
             ayrı, ikinci bir katman. Unutursan mevcut girişlere bir daha erişemezsin,
             iyi not al.
@@ -117,7 +117,7 @@ export function Diary() {
           <div
             onClick={app.diaryUnlocking ? undefined : handleSubmit}
             className="btn-dark"
-            style={{ width: 260, padding: '12px 0', fontSize: 13, textAlign: 'center', cursor: app.diaryUnlocking ? 'default' : 'pointer', borderRadius: 3, opacity: app.diaryUnlocking ? 0.6 : 1 }}
+            style={{ width: 260, padding: '12px 0', fontSize: 14, textAlign: 'center', cursor: app.diaryUnlocking ? 'default' : 'pointer', borderRadius: 3, opacity: app.diaryUnlocking ? 0.6 : 1 }}
           >
             {app.diaryUnlocking ? 'açılıyor…' : firstTimeSetup ? 'Parolayı kaydet' : 'Aç'}
           </div>
@@ -151,10 +151,10 @@ export function Diary() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, border: `1px solid ${colors.border}`, background: colors.panel, padding: '20px', borderRadius: 4 }}>
           <textarea value={qText} onChange={(e) => setQText(e.target.value)} placeholder="Bugün ne oldu?" style={inputStyle} />
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <div onClick={cancel} className="btn-outline-hover" style={{ padding: '9px 16px', border: `1px solid ${colors.borderStrong}`, color: colors.inkSoft, fontSize: 13, cursor: 'pointer', borderRadius: 3 }}>
+            <div onClick={cancel} className="btn-outline-hover" style={{ padding: '9px 16px', border: `1px solid ${colors.borderStrong}`, color: colors.inkSoft, fontSize: 14, cursor: 'pointer', borderRadius: 3 }}>
               Vazgeç
             </div>
-            <div onClick={save} className="btn-dark" style={{ padding: '9px 16px', fontSize: 13, cursor: 'pointer', borderRadius: 3 }}>
+            <div onClick={save} className="btn-dark" style={{ padding: '9px 16px', fontSize: 14, cursor: 'pointer', borderRadius: 3 }}>
               Kaydet
             </div>
           </div>

@@ -407,6 +407,61 @@ Gerçek tarayıcı testleriyle doğrulandı: hafta oklarıyla ileri gidince etik
 ### Uçtan uca doğrulama
 Gerçek tarayıcı testiyle: kalın+italik+liste biçimlendirmesi uygulanıp bir gerçek görsel yüklendi → editördeki HTML'de `<b>`/`<i>`/`<ul><li>`/gerçek bir Cloudinary `<img>` URL'i doğrulandı → Kaydet'e basılıp render edilen girişte AYNI biçimlendirme + görsel doğru göründü → Redis'teki `/api/state` kaydı doğrudan okunarak `bodyHtml`'in gerçek Cloudinary URL'ini içerdiği, buna karşın `body` (özetleme/sayaç için kullanılan düz metin alanı) içinde HİÇBİR HTML etiketi kalmadığı doğrulandı.
 
+## Aşama 25 — Düzeltmeler Turu ✅
+
+Zeynep'in gerçek kullanım sonrası bildirdiği 10 maddelik bir liste — bazıları gerçek buglar, bazıları eksik özellik, biri kök-neden teşhisi gerektiren bir "çalışmıyor" raporu, biri de genel bir okunabilirlik isteği. Hepsi tek bir oturumda sırayla uygulandı.
+
+### 1. Bir Şey Öğrendim — biçimlendirme butonları gerçek toggle değil ✅
+- [x] **Kök neden:** Araç çubuğu düğmeleri sıradan `<div onClick>` idi — bir düğmeye TIKLAMADAN ÖNCE tarayıcı `mousedown` anında contentEditable'daki metin seçimini/odağı kaybediyordu, bu yüzden `execCommand('bold'/'italic')` ya seçili metne hiç uygulanmıyordu ya da boş bir imlece uygulanıp görünürde hiçbir şey olmuyordu.
+- [x] **Düzeltme:** Her araç çubuğu düğmesine `onMouseDown={(e) => e.preventDefault()}` eklendi — bu, tarayıcının o an editördeki seçimi DEĞİŞTİRMESİNİ engelliyor, `onClick` çalıştığında seçim hâlâ duruyor. Standart zengin metin editörü tekniği.
+- [x] Düğmeler artık `document.queryCommandState(...)` ile gerçek "aktif mi" durumunu okuyup görsel olarak vurgulanıyor (`Learn.tsx` → `useActiveFormats`, editördeki `onKeyUp`/`onMouseUp`/`onFocus` ile güncelleniyor) — "bir butona basılınca aktif olsun" isteğinin görsel karşılığı.
+- [x] **Doğrulandı:** metin seçilip Kalın'a basınca `<b>` ile sarılıyor; imleç sona alınıp İtalik'e basılıp yeni metin yazılınca yeni yazılan kısım `<i>` içinde çıkıyor (native "typing state" toggle davranışı, artık gerçekten çalışıyor).
+
+### 2. Araştırılacak Konular — ekleme/silme çalışmıyor ✅
+- [x] **Kök neden (iki katmanlı):** (a) `ExtraTopic` tipinde hiç `id` yoktu, Ana Sayfa'daki toggle kodu `i: 'extra0'` gibi bir STRING üretip `typeof t.i === 'number'` kontrolüyle karşılaştırıyordu — bu hep `false` dönüp toggle'ı sessizce no-op yapıyordu; silme hiç yoktu. (b) Sol menüdeki asıl "Araştırılacak Konular" SAYFASI (`Topics.tsx`) sadece sabit (seed) `TOPICS` listesini gösteriyordu — `app.extraTopics` (Ana Sayfa'dan eklenenler) o sayfada HİÇ görünmüyordu, sayfanın kendi bir "yeni konu ekle" formu da yoktu.
+- [x] `ExtraTopic`'e `id`/`addedDate`/`done`/`doneDate` eklendi (+ eski gerçek kullanıcı verisi için sessiz bir migration, `normalizeExtraTopics`). Yeni `app.toggleExtraTopic(id)`/`app.removeExtraTopic(id)` action'ları.
+- [x] `Topics.tsx` artık `extraTopics`'i de gösteriyor, kendi "+ Yeni araştırılacak konu ekle" formu var (Ana Sayfa'yla aynı `qTopic`/`addTopic` state'ini paylaşıyor), her eklenen konunun yanında bir silme ikonu var.
+- [x] Ana Sayfa'daki "Merak konuları" widget'ının toggle'ı düzeltildi, oraya da bir silme ikonu eklendi.
+
+### 3. Tüm mock/örnek verileri kaldır ✅
+- [x] `data.ts`'teki TÜM örnek içerik (MONTHS, ENTRIES, ARTICLES, LINKS, TOPICS, PROJECTS, PROGRAMS, POEMS, **DIARY** — sahte bir günlük dahil) boş dizilere/nesnelere indirildi. Tip/arayüzler bilerek korundu, sadece İÇERİK kaldırıldı — kod genelinde büyük bir refactor gerekmedi.
+- [x] **Çökme riski taranıp kapatıldı:** `Learn.tsx`'in "tek aktif giriş" görünümü (`entries[activeIndex]`) sıfır giriş varken `undefined`'a erişip çökerdi — artık `!article` durumunda "Henüz bir giriş yok" boş-durum mesajı gösteriyor. `Growth.tsx`'in "bu ay" kartı eskiden hep `MONTHS[0]`'a (artık yok) gömülüydü — MONTHS boşken gerçek referans tarihinden türetilen sentetik bir "bu ay" kartı kullanılıyor (yeni eklenen gelişim notları hâlâ bir yere gidiyor), hiç not yoksa boş-durum mesajı. `stats.ts`'teki ay etiketi de aynı şekilde gerçek tarihe düştü.
+- [x] **Uydurma sayılar** da temizlendi: `Sidebar.tsx`'teki nav sayaçları eskiden `sabit_sayı + gerçek.length` idi (ör. Akademik Gelişim hep `'42'`, Linkler `86 + gerçek`) — artık tamamen `seed.length + gerçek.length` (seed boş olduğu için fiilen sadece gerçek veri). `Links.tsx`'teki filtre etiketleri (`'Tümü · 86'` gibi) gerçek sayılardan hesaplanıyor. `Growth.tsx`'teki sabit `"42 not · 9 ay"` metni de kaldırıldı.
+- [x] **Gerçek verideki mevcut kullanıcı verisi hiç etkilenmedi** — Redis'teki `extraPrograms`/`extraLinks`/`extraTopics`/`extraProjects`/gerçek `learnEntries`/`diaryEntries`/`poemEntries` (Zeynep'in kendi eklediği her şey) `data.ts`'teki bu sabitlerden tamamen bağımsız, Redis'te ayrı tutuluyor — bu değişiklik SADECE koddaki demo içeriği kaldırdı.
+
+### 4. Bir Şey Öğrendim — kayıtlı giriş düzenlenemiyor ✅
+- [x] Madde 1'deki araç çubuğuyla AYNI editör bileşeni yeniden kullanılarak (`LearnEditorForm`, hem yeni-giriş hem düzenleme formunda) bir "Düzenle" bağlantısı eklendi (sadece kullanıcının kendi eklediği — `id` "user-" ile başlayan — girişlerde; seed/tasarım girişleri yok zaten). Yeni `app.updateLearnEntry(id, title, bodyHtml)` — başlık/gövde/teaser/okuma süresi yeniden hesaplanıyor, `id`/`date`/mevcut özet korunuyor.
+
+### 5. Ollama özetleme tetiklenmiyor — kök neden bulundu (Aşama 20'den DEĞİL, Aşama 13'ten kalma) ✅
+- [x] **Gerçek kök neden:** `src/lib/ollama.ts`, Ollama'ya HEM geliştirmede HEM production'da AYNI göreli `/api/ollama` yolunu kullanıyordu. Ama `server.js` bu yolu Aşama 13'ten beri KASITLI 404'lüyor (Ollama Render'ın sunucusundan hiçbir zaman görünmez, sadece Zeynep'in kendi bilgisayarından). Sonuç: Zeynep gerçek siteyi (zdemir.tech) Ollama'nın çalıştığı bilgisayardan açsa BİLE, tarayıcı isteği zdemir.tech'in kendi sunucusuna (Render) gidiyordu — hiçbir zaman tarayıcının kendi makinesindeki gerçek Ollama'ya ulaşmıyordu. **Bu, Aşama 20'nin bir regresyonu değil — davranış Aşama 13'ten beri hep böyleydi**, ama gerçek kök neden buydu.
+- [x] **Düzeltme:** `ollama.ts`'teki `BASE`, production build'de artık `http://localhost:11434`'e DOĞRUDAN gidiyor (Render üzerinden değil) — `import.meta.env.DEV` ile geliştirme/production ayrımı yapılıyor, geliştirmede eski Vite proxy davranışı AYNEN korunuyor. HTTPS bir sayfadan `http://localhost`'a istek atmak modern tarayıcılarda (Chrome 94+) mixed-content olarak engellenmiyor (localhost için özel istisna).
+- [x] **⚠️ Zeynep'in yapması gereken TEK manuel adım:** Bu düzeltmenin işe yaraması için Ollama'nın kendi CORS ayarı (`OLLAMA_ORIGINS`) `https://zdemir.tech` origin'ine izin vermeli — yoksa Ollama isteği kendisi reddeder (tarayıcı konsolunda bir CORS hatası görülür). Linux'ta Ollama'yı nasıl çalıştırdığına göre: `OLLAMA_ORIGINS=https://zdemir.tech ollama serve` (elle başlatılıyorsa) ya da systemd servisiyse `sudo systemctl edit ollama` ile `Environment="OLLAMA_ORIGINS=https://zdemir.tech"` ekleyip `sudo systemctl restart ollama`. Bu adım kod dışı olduğu için benim tarafımdan yapılamadı/test edilemedi — bkz. README'deki yeni not.
+- [x] Production build'in derlenmiş çıktısında artık gerçekten `localhost:11434` string'i geçtiği, göreli `/api/ollama` yolunun KALMADIĞI doğrulandı (`grep` ile).
+
+### 6. "Araştırılacak Konular" / "Merak Konuları" isim tutarsızlığı + link ekleme ✅
+- [x] Ana Sayfa'daki "Merak konuları" başlığı "Araştırılacak Konular" yapıldı (sol menü/sayfa başlığıyla tutarlı); ilgili istatistik etiketi ("Kapanan merak konusu" → "Kapanan araştırma konusu") ve placeholder metni de güncellendi.
+- [x] Link ekleme özelliği ZATEN vardı (`topicLinks`, her konunun 🔗 ikonuyla genişleyip link ekleme/silme/tıklayınca gitme) — madde 2'deki düzeltmeyle artık `extraTopics` da aynı mekanizmayı (title-keyed, statik/ek fark etmiyor) otomatik olarak kullanabiliyor.
+
+### 7. Genel "geri al / silme" eksikliği — tüm modüllerde ✅
+- [x] Taranan modüller ve durumları: **Şiir** ve **Günlük** zaten tam düzenleme/silme destekliyordu (dokunulmadı). **Program Takvimi** zaten Aşama 22'de silme kazanmıştı. Gerçek eksikler bulunup kapatıldı:
+  - **Linkler:** `ExtraLink`'e `id` eklendi (yoktu, silinemiyordu) + migration; yeni `app.removeExtraLink(id)`; her kartta bir silme ikonu.
+  - **Yapılacak Projeler:** yeni `app.removeExtraProject(id)`; proje detay sayfasında "Projeyi sil" (sadece eklenen projelerde, seed'de değil).
+  - **Bir Şey Öğrendim:** yeni `app.removeLearnEntry(id)`; "Düzenle"nin yanında "Sil" (madde 4'teki aynı yerde).
+  - **Araştırılacak Konular:** madde 2'de zaten eklendi.
+
+### 8. Ana Sayfa takvimi bugünün haftasını göstermiyor ✅
+- [x] **Kök neden:** Aşama 22'de eklenen hafta/ay gezinme özelliğinin varsayılan "çapa" tarihi BİLEREK eski sabit demo penceresiyle (1 Eylül 2026) aynı görünümü verecek şekilde sabitlenmişti — sayfa HER AÇILDIĞINDA aynı sabit haftayı gösteriyordu, gerçek "bugün"e hiç bakmıyordu.
+- [x] **Düzeltme:** `Home.tsx`'teki `anchorDate`'in başlangıç değeri artık gerçek `new Date()` (tarayıcının GERÇEK anlık tarihi) — uygulamanın geri kalanındaki dondurulmuş `TODAY` demo sabitinden (bkz. Aşama 15, bilerek dokunulmadı) BAĞIMSIZ. Sayfa artık her açıldığında gerçek o haftayı/ayı gösteriyor. **Doğrulandı:** gerçek test tarihinde (29 Eylül 2026) sayfa "29 EYLÜL 2026 · SALI" başlığıyla ve Eylül ayına ait gerçek haftayla açıldı.
+
+### 9. Keşfedilen Programlar'daki başlık altı açıklamayı kaldır ✅
+- [x] `Discover.tsx`'teki başlık altı açıklama cümlesi kaldırıldı — Aşama 3'teki "başlık altı açıklama olmasın" kuralı burada atlanmış, şimdi diğer sayfalarla tutarlı.
+
+### 10. Genel gövde metni font boyutu çok küçük ✅
+- [x] Tüm `.tsx` bileşenlerinde gövde/paragraf metni için kullanılan font boyutu kümesi (13/13.5/14/14.5) +1px kaydırıldı (→ 14/14.5/15/15.5) — proje genelinde tutarlı bir `sed` geçişiyle, çakışma olmadan (büyükten küçüğe sırayla uygulanarak). Etiket/tarih/rozet gibi küçük "chrome" metinleri (10-12.5px) ve başlıklar (17px+) BİLEREK dokunulmadı — "başlıklarla orantıyı bozmadan" isteğine uygun, sadece okunan asıl metin büyüdü.
+
+### Uçtan uca doğrulama
+Gerçek tarayıcı testleriyle: kalın/italik seçili metne VE yeni yazılan metne doğru uygulanıyor; Araştırılacak Konular'da ekleme/toggle/silme üçü de çalışıyor; TÜM boş ekranlar (Akademik Gelişim, Bir Şey Öğrendim, Linkler, Projeler, Takvim, Konular, Keşfedilen Programlar, Günlük, Şiir) sıfır veriyle AÇILIP ÇÖKMEDİ, ilgili boş-durum mesajları doğru göründü; sol menü sayaçları gerçekten `0` gösterdi (uydurma sayı yok); bir giriş eklenip düzenlenip silindi (Bir Şey Öğrendim); bir link eklenip silindi; bir proje eklenip detayından silindi; Keşfedilen Programlar'da açıklama cümlesi yok; Ana Sayfa gerçek test tarihiyle (29 Eylül 2026 Salı) açılıp doğru haftayı/ayı gösterdi. Production build'in derlenmiş JS'inde Ollama URL'inin artık `localhost:11434` olduğu doğrulandı. Testler, gerçek `app:state` anahtarına dokunmadan geçici bir test anahtarıyla yapıldı (bkz. Aşama 20'deki aynı yöntem); test sonrası gerçek anahtarın (Zeynep'in gerçek kullanımıyla oluşmuş, örn. 6 gerçek `extraProgram`) etkilenmediği doğrulandı.
+
 ## Gelecek fikirleri (henüz plana alınmadı, sadece not)
 - Arka plan görselleri için otomatik/AI üretilen görsellere geçiş — Aşama 21'de bunun yerine sitenden doğrudan yükleme/silme (self-servis) tercih edildi, bu fikir hâlâ ayrı bir olasılık olarak (ör. hiç fotoğraf eklenmediğinde bir "varsayılan AI seti" gibi) not düşülüyor.
 - Anahtar kelimelerin kullanıcı içeriğinden otomatik çıkarılması (bkz. Aşama 11).
