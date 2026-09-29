@@ -382,6 +382,12 @@ Telegram/SerpApi için sunucu tarafı vekil (proxy) görevi görüyor.
 - IP başına 5 başarısız giriş denemesinden sonra 60 saniyelik kilit
   (bellek içi, Render yeniden başlayınca sıfırlanır — tam bir çözüm değil
   ama otomatik parola denemesini pratik olmaktan çıkarır).
+- **Şifremi unuttum (bkz. PLAN.md Aşama 27):** giriş sayfasındaki
+  "Şifremi unuttum" butonu, mevcut site parolasını Telegram botu
+  üzerinden (bkz. aşağıdaki "Günlük Telegram Bildirimi") SADECE
+  `TELEGRAM_CHAT_ID` ile yapılandırılmış sohbete gönderir — HTTP
+  yanıtında parola hiçbir zaman dönmez, IP başına 5 dakikalık bir
+  soğuma süresi var. Telegram yapılandırılı değilse buton hiç görünmez.
 - `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` başlıkları
   her yanıtta gönderiliyor.
 - Günlük (Diary) girişleri gerçekten şifreleniyor: AES-GCM, tarayıcıda

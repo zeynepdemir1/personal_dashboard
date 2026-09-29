@@ -158,6 +158,9 @@ const LOGIN_PAGE_HTML = `<!doctype html>
   button{padding:12px 0;border:none;border-radius:4px;background:#604D53;color:#FFDBDA;font-size:13px;cursor:pointer;}
   button:hover{background:#4A3B3E;}
   #err{color:#B0554F;font-size:12.5px;text-align:center;min-height:16px;}
+  #forgot{background:none;border:none;color:#8C6B70;font-size:11.5px;cursor:pointer;padding:2px;text-decoration:underline;text-underline-offset:2px;}
+  #forgot:hover{color:#604D53;}
+  #forgotMsg{font-size:11.5px;text-align:center;min-height:14px;color:#8C6B70;}
 </style>
 </head>
 <body>
@@ -166,6 +169,7 @@ const LOGIN_PAGE_HTML = `<!doctype html>
   <input id="p" type="password" placeholder="Parola" autocomplete="current-password" autofocus />
   <button type="submit">Giriş</button>
   <div id="err"></div>
+  ${TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID ? '<button type="button" id="forgot">Şifremi unuttum</button><div id="forgotMsg"></div>' : ''}
 </form>
 <script>
 document.getElementById('f').addEventListener('submit', async (e) => {
@@ -190,6 +194,28 @@ document.getElementById('f').addEventListener('submit', async (e) => {
     err.textContent = 'Bağlantı hatası, tekrar dene.';
   }
 });
+const forgotBtn = document.getElementById('forgot');
+if (forgotBtn) {
+  forgotBtn.addEventListener('click', async () => {
+    const msg = document.getElementById('forgotMsg');
+    forgotBtn.disabled = true;
+    msg.textContent = 'gönderiliyor…';
+    try {
+      const res = await fetch('/api/forgot-password', { method: 'POST' });
+      if (res.ok) {
+        msg.textContent = 'Telegram\\'a gönderildi, kontrol et.';
+      } else if (res.status === 429) {
+        msg.textContent = 'Az önce gönderildi, birkaç dakika bekle.';
+      } else {
+        msg.textContent = 'Gönderilemedi, tekrar dene.';
+      }
+    } catch {
+      msg.textContent = 'Bağlantı hatası, tekrar dene.';
+    } finally {
+      forgotBtn.disabled = false;
+    }
+  });
+}
 </script>
 </body>
 </html>`;
@@ -243,7 +269,7 @@ app.use((req, res, next) => {
     next();
     return;
   }
-  if (req.path === '/api/login' || CRON_ONLY_PATHS.has(req.path)) {
+  if (req.path === '/api/login' || req.path === '/api/forgot-password' || CRON_ONLY_PATHS.has(req.path)) {
     next();
     return;
   }
@@ -290,6 +316,48 @@ app.post('/api/login', express.json(), (req, res) => {
     path: '/',
   });
   res.json({ ok: true });
+});
+
+// Şifremi unuttum (bkz. PLAN.md Aşama 27) — Zeynep yanlışlıkla çıkış
+// yapıp parolayı hatırlamadığı bir durumda kilitli kaldı. Gerçek bir
+// "parola sıfırlama" akışı (e-posta, token vb.) bu tek kullanıcılı, e-posta
+// altyapısı olmayan araç için orantısız olurdu — bunun yerine zaten
+// kurulu olan Telegram botu üzerinden (bkz. Aşama 15) MEVCUT parolayı
+// SADECE kendi Telegram sohbetine gönderiyor. Yanıt gövdesinde parola
+// asla dönmüyor — çağıran kişi (bu uç nokta giriş korumasının dışında
+// olduğu için herkes çağırabilir) parolayı HTTP yanıtından öğrenemez,
+// sadece Zeynep'in kendi Telegram'ına ulaşır. Basit bir IP başına
+// soğuma süresiyle (5 dk) Telegram'ın spam mesajla doldurulması
+// engelleniyor.
+const forgotPasswordAttempts = new Map(); // ip -> son gönderim zamanı
+const FORGOT_PASSWORD_COOLDOWN_MS = 5 * 60 * 1000;
+
+app.post('/api/forgot-password', async (req, res) => {
+  if (!AUTH_CONFIGURED) {
+    res.status(503).json({ error: 'auth not configured' });
+    return;
+  }
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    res.status(503).json({ error: 'telegram not configured' });
+    return;
+  }
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const last = forgotPasswordAttempts.get(ip) || 0;
+  const now = Date.now();
+  if (now - last < FORGOT_PASSWORD_COOLDOWN_MS) {
+    res.status(429).json({ error: 'too soon' });
+    return;
+  }
+  forgotPasswordAttempts.set(ip, now);
+  try {
+    await sendTelegramMessage(
+      `🔑 Mühendis Gelişim Portalı — giriş sayfasındaki "Şifremi unuttum" ile istendi.\n\nParolan: ${SITE_PASSWORD}`,
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[server] Şifre hatırlatma Telegram mesajı gönderilemedi:', err);
+    res.status(502).json({ error: 'send failed' });
+  }
 });
 
 // Çıkış yap (bkz. PLAN.md Aşama 19 madde 7) — oturum çerezi 30 gün
