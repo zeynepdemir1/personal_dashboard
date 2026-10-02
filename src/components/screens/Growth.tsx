@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useApp } from '../../state/AppState';
-import { colors, fonts, pillStyle } from '../../lib/theme';
+import { colors, fonts } from '../../lib/theme';
 import { MONTHS } from '../../lib/data';
 import { SEED_LEARN_ENTRIES } from '../../lib/learn';
 import { referenceToday, MONTH_FULL_TR } from '../../lib/dates';
@@ -12,8 +12,6 @@ export function Growth() {
   const gridGrowth: CSSProperties = narrow
     ? { display: 'grid', gridTemplateColumns: '1fr', gap: 34, alignItems: 'start' }
     : { display: 'grid', gridTemplateColumns: '290px minmax(430px, 1fr)', gap: 48, alignItems: 'start' };
-
-  const filters = ['Tümü', 'Kontrol', 'Gömülü', 'Analog', 'Matematik'];
 
   const learnEntries = [...app.learnEntries, ...SEED_LEARN_ENTRIES];
 
@@ -68,12 +66,7 @@ export function Growth() {
         </h1>
       </header>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', borderTop: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}`, padding: '12px 0' }}>
-        {filters.map((f, i) => (
-          <div key={f} className="hover-row" style={pillStyle(i === 0)}>
-            {f}
-          </div>
-        ))}
+      <div style={{ display: 'flex', alignItems: 'center', borderTop: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}`, padding: '12px 0' }}>
         <div style={{ marginLeft: 'auto', fontFamily: fonts.sans, fontSize: 11, color: colors.inkSoft, whiteSpace: 'nowrap' }}>
           {totalNotes} not · {MONTHS.length > 0 ? months.length : totalNotes > 0 ? 1 : 0} ay
         </div>

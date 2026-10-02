@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { useApp } from '../../state/AppState';
-import { colors, fonts } from '../../lib/theme';
+import { colors, fonts, pillStyle } from '../../lib/theme';
 import type { DiscoveredProgram } from '../../lib/discover';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -14,6 +15,7 @@ const CATEGORY_ORDER = ['hackathon', 'tubitak', 'teknofest', 'staj'];
 export function Discover() {
   const app = useApp();
   const narrow = app.width < 1180;
+  const [activeFilter, setActiveFilter] = useState('Tümü');
 
   const groups = new Map<string, DiscoveredProgram[]>();
   for (const p of app.discoveredPrograms) {
@@ -21,10 +23,11 @@ export function Discover() {
     list.push(p);
     groups.set(p.category, list);
   }
-  const orderedCategories = [
+  const allCategories = [
     ...CATEGORY_ORDER.filter((c) => groups.has(c)),
     ...[...groups.keys()].filter((c) => !CATEGORY_ORDER.includes(c)),
   ];
+  const orderedCategories = activeFilter === 'Tümü' ? allCategories : allCategories.filter((c) => c === activeFilter);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 40 }}>
@@ -33,6 +36,28 @@ export function Discover() {
           Keşfedilen Programlar
         </h1>
       </header>
+
+      {allCategories.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', borderTop: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}`, padding: '12px 0' }}>
+          <div
+            className="hover-row"
+            style={pillStyle(activeFilter === 'Tümü')}
+            onClick={() => setActiveFilter('Tümü')}
+          >
+            Tümü
+          </div>
+          {allCategories.map((c) => (
+            <div
+              key={c}
+              className="hover-row"
+              style={pillStyle(activeFilter === c)}
+              onClick={() => setActiveFilter(c)}
+            >
+              {CATEGORY_LABELS[c] ?? c}
+            </div>
+          ))}
+        </div>
+      )}
 
       {app.discoveredPrograms.length === 0 && (
         <div style={{ fontSize: 14.5, color: colors.inkFaint, fontStyle: 'italic' }}>

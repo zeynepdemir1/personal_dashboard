@@ -105,14 +105,19 @@ bir cihazda açıldığında** yerel modelle yapılır. Süresi geçmiş sonuçl
 otomatik olarak elenir — açık bir son başvuru tarihi varsa ona bakılır;
 yoksa (Ollama küçük bir modelle her zaman tarih çıkaramadığı için, bkz.
 PLAN.md Aşama 23) metinde geçen en yeni yıl bugünün yılından eskiyse
-sonuç yine de geçmiş kabul edilip gösterilmez. Sol menüdeki kendi
-sayfasında kategoriye
-(hackathon/TÜBİTAK/Teknofest/staj) göre gruplanmış olarak, Ana Sayfa'da
-ise tarihe göre sıralı, dörderli bir carousel olarak gösterilir. Her
-sonucun yanında bir "Takip et" aksiyonu var — tıklanınca o sonuç, elle
-tarih/not girmeden, Program Takvimi'ne gerçek bir kayıt olarak eklenir.
-Yeni + alakalı bulunan sonuçlar tek bir toplu Telegram mesajıyla da
-bildirilir.
+sonuç yine de geçmiş kabul edilip gösterilmez. Ayrıca bir sonuç listeye
+girdikten (alakalı bulunup gösterilmeye başladıktan) **1 hafta** sonra
+otomatik olarak gözden kaybolur (bkz. PLAN.md Aşama 30) — eskiler hiç
+silinmeden birikip yeni/iyi sonuçların gözden kaçmasına yol açmasın diye.
+Sol menüdeki kendi sayfasında kategoriye
+(hackathon/TÜBİTAK/Teknofest/staj) göre gruplanmış olarak gösterilir,
+Akademik Gelişim'deki filtre pilleriyle aynı görünümde bir filtre
+çubuğuyla tek bir kategoriye daraltılabilir ("Tümü" ile tekrar hepsi
+gösterilir); Ana Sayfa'da ise tarihe göre sıralı, dörderli bir carousel
+olarak gösterilir. Her sonucun yanında bir "Takip et" aksiyonu var —
+tıklanınca o sonuç, elle tarih/not girmeden, Program Takvimi'ne gerçek
+bir kayıt olarak eklenir. Yeni + alakalı bulunan sonuçlar tek bir toplu
+Telegram mesajıyla da bildirilir.
 
 ### Takvim (Ana Sayfa)
 Haftalık (saat bazlı, ders/etkinlik blokları) ve aylık (gün başına

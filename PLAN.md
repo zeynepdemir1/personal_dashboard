@@ -509,6 +509,23 @@ Zeynep haklı bir güvenlik sorusu sordu: `ollama-relay.js` sadece `https://zdem
 - [x] **Gerçek testle doğrulandı** (çalışan systemd servisi yeniden başlatılıp): `https://zdemir.tech` origin'i → 200, gerçek Ollama yanıtı. `https://evil.com` origin'i → 403, Ollama'ya hiç gidilmedi. Origin header'ı hiç olmayan istek → 403. Kötü niyetli origin'den gelen bir OPTIONS preflight → 403 (eskiden olduğu gibi 204 + PNA header'ı değil).
 - [x] Çalışan servis zaten yeniden başlatılıp düzeltilmiş haliyle aktif — ayrıca commit/push ile koda da yansıtıldı.
 
+## Aşama 30 — Keşif Filtreleri + Akademik Gelişim'deki Ölü Filtre + 1 Haftalık Otomatik Temizlik ✅
+
+Zeynep gerçek kullanımda üç şey bildirdi: (1) Keşfedilen Programlar'da kategoriye göre filtreleme istiyor, Akademik Gelişim'deki filtre pilleriyle aynı görünümde; (2) Akademik Gelişim'deki filtre pilleri ("Tümü, Kontrol, Gömülü, Analog, Matematik") zaten işlevsizdi, mock veri döneminden kalan başlıklar taşıyordu; (3) Keşfedilen Programlar listesinde eskiler hiç silinmediği için (gerçek veride 724 kayıt, 251'i şu an görünür durumdaydı) iyi/yeni sonuçlar gözden kaçıyordu.
+
+### 1. Akademik Gelişim'deki ölü filtre kaldırıldı ✅
+- [x] `Growth.tsx`'teki `filters = ['Tümü', 'Kontrol', 'Gömülü', 'Analog', 'Matematik']` dizisi ve hiçbir `onClick`'i olmayan pill render bloğu tamamen kaldırıldı — bunlar eski `MONTHS` seed verisinin `tags` alanlarından kalma, tıklanınca hiçbir şey yapmayan dekoratif kalıntılardı. Not/ay sayacı (`{totalNotes} not · {ay} ay`) aynı yerde, filtre çubuğu olmadan korundu.
+
+### 2. Keşfedilen Programlar'a gerçek, işlevsel kategori filtresi eklendi ✅
+- [x] `Discover.tsx`'e Akademik Gelişim'de kullanılan AYNI `pillStyle()` (bkz. `lib/theme.ts`) ile görsel olarak birebir eşleşen bir filtre çubuğu eklendi: "Tümü" + o anda veride bulunan her kategori ("Hackathon'lar", "TÜBİTAK Programları", "Teknofest Kategorileri", "Staj İlanları") birer pill olarak gösteriliyor, sadece veri hiç yoksa (`allCategories.length === 0`) çubuk hiç render edilmiyor.
+- [x] `useState` ile seçili filtre tutuluyor; "Staj" pill'ine basınca sadece Staj İlanları bölümü, "Hackathon" pill'ine basınca sadece Hackathon'lar bölümü gösteriliyor ("Tümü" tüm kategorileri eski haliyle gösteriyor) — gerçek bir filtre, sadece scroll/anchor değil.
+
+### 3. Keşfedilen Programlar'da 1 haftalık otomatik temizlik ✅
+- [x] **Kök neden:** `/api/discover/relevant` zaten son başvuru tarihi geçmiş veya metindeki yıl eskiyse (bkz. Aşama 19/22) sonuçları eliyordu, ama bunların HİÇBİRİ "ne zaman eklendi"ye bakmıyordu — tarihi/yılı belirsiz (`deadline: null`, yıl geçmeyen) her sonuç SÜRESİZ listede kalıyordu. Gerçek veride (salt-okunur doğrulandı) 724 kayıttan 251'i bu yüzden hâlâ görünürdü.
+- [x] **Düzeltme:** Yeni `isExpiredFromList()` (`server.js`) — bir sonuç `status:'relevant'` olup listeye GİRDİĞİ an (`filteredAt`, yoksa `foundAt`'a düşülüyor) üzerinden 7 günden fazla geçmişse `/api/discover/relevant`'ta artık gösterilmiyor; mevcut deadline/yıl filtresiyle AYNI "okuma anında ele, ayrı bir cron/temizlik işine gerek yok" deseniyle (ayrı bir silme/HDEL işlemi yapılmıyor, Redis'teki kayıtlar duruyor ama liste kendini buduyor).
+- [x] **Doğrulandı (salt-okunur, gerçek `discover:items`'a hiç yazma yapılmadan):** Saf `isExpiredFromList` mantığı 6 senaryoyla (6/8 gün önce, tam sınırda, `filteredAt` eksik, hiç zaman bilgisi yok, az önce eklenmiş) birim test edildi, hepsi doğru sonuç verdi. Gerçek Redis verisi üzerinde (sadece `HGETALL`/`HLEN`/`HRANDFIELD` ile okundu, hiçbir yazma yapılmadı) alan şekli (`foundAt`/`filteredAt` gerçekten ISO string) doğrulandı ve filtre zincirinin gerçek etkisi ölçüldü: 724 toplam kayıt → 360 `relevant`+`!dismissed` → mevcut deadline/yıl filtresiyle 251 → yeni 1 haftalık filtreyle **166**. Bu sayı zaman geçtikçe (bekleyen kuyruk işlendikçe) kendiliğinden küçülmeye devam edecek, ayrı bir temizlik adımı gerekmiyor.
+- [x] `tsc --noEmit` ve `node --check server.js` temiz geçti. UI tarafı (filtre pilleri) canlı girişle (gerçek parola Redis'te, benim erişimim yok) test EDİLEMEDİ — kod, Akademik Gelişim'deki aynı `pillStyle` deseniyle birebir yazıldı ve tip kontrolünden geçti, ama Zeynep'in kendi gözüyle bir kez kontrol etmesi önerilir.
+
 ## Gelecek fikirleri (henüz plana alınmadı, sadece not)
 - Arka plan görselleri için otomatik/AI üretilen görsellere geçiş — Aşama 21'de bunun yerine sitenden doğrudan yükleme/silme (self-servis) tercih edildi, bu fikir hâlâ ayrı bir olasılık olarak (ör. hiç fotoğraf eklenmediğinde bir "varsayılan AI seti" gibi) not düşülüyor.
 - Anahtar kelimelerin kullanıcı içeriğinden otomatik çıkarılması (bkz. Aşama 11).

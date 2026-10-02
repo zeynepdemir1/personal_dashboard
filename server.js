@@ -613,6 +613,20 @@ function isStaleByYear(item) {
   return y !== null && y < new Date().getFullYear();
 }
 
+// PLAN.md Aşama 30: eski sonuçlar listede hiç silinmeden birikiyor, bu da
+// gerçekten yeni/iyi bulunan sonuçların eskilerin arasında gözden kaçmasına
+// yol açıyordu. Bir sonuç "relevant" olarak işaretlenip listeye girdikten
+// (filteredAt) bir hafta sonra artık burada gösterilmiyor — ayrı bir
+// temizleme/cron işine gerek yok, isStaleByYear'daki gibi okuma anında elenir.
+const DISCOVER_LIST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+function isExpiredFromList(item) {
+  const addedAt = item.filteredAt || item.foundAt;
+  if (!addedAt) return false;
+  const addedTime = new Date(addedAt).getTime();
+  if (Number.isNaN(addedTime)) return false;
+  return Date.now() - addedTime > DISCOVER_LIST_TTL_MS;
+}
+
 function buildDailyMessage() {
   const upcoming = UPCOMING_PROGRAMS.map((p) => ({ ...p, left: daysLeftReal(p.date) }))
     .filter((p) => p.left >= 0)
@@ -850,6 +864,7 @@ app.get('/api/discover/relevant', async (_req, res) => {
     const relevant = items
       .filter((it) => it.status === 'relevant' && !it.dismissed)
       .filter((it) => (it.deadline ? daysLeftReal(it.deadline) >= 0 : !isStaleByYear(it)))
+      .filter((it) => !isExpiredFromList(it))
       .sort((a, b) => (a.foundAt < b.foundAt ? 1 : -1));
     res.json({ items: relevant });
   } catch (err) {
