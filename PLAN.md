@@ -500,6 +500,15 @@ Aşama 25'in "Ollama düzeltildi" özetinin ardından Zeynep gerçek kullanımda
 - [x] Sidebar profil menüsüne "Parola değiştir" eklendi (mevcut parola + yeni parola + yeni parola tekrar, "Profili düzenle"/"Çıkış yap" ile aynı yerde).
 - [x] **Uçtan uca doğrulandı** (gerçek `auth:password` anahtarına DOKUNMADAN, geçici bir test anahtarıyla — bkz. Aşama 20/21'deki aynı test-güvenliği yöntemi): parola değiştirildi → ESKİ parolayla giriş denemesi doğru şekilde reddedildi → YENİ parolayla giriş başarılı oldu → yanlış "mevcut parola" ile değiştirme denemesi 401 ile reddedildi → 6 karakterden kısa yeni parola 400 ile reddedildi. Test sonrası gerçek `auth:password` anahtarının hâlâ hiç var olmadığı (Zeynep'in gerçek girişi hâlâ `SITE_PASSWORD` env değişkenine bağlı) doğrulandı.
 
+## Aşama 29 — ollama-relay.js Güvenlik Sertleştirmesi ✅
+
+Zeynep haklı bir güvenlik sorusu sordu: `ollama-relay.js` sadece `https://zdemir.tech`'e mi izin veriyor, yoksa herhangi bir siteye mi açık?
+
+- [x] **Bulunan gerçek sorun:** Joker karakter (`*`) YOKTU, `Access-Control-Allow-Origin` header'ı zaten sadece eşleşen origin'e ayarlanıyordu — AMA kod, origin eşleşmese BİLE isteği Ollama'ya YÖNLENDİRMEYE devam ediyordu (sadece YANIT HEADER'LARI origin'e göre koşulluydu, isteğin kendisi değil). Tarayıcının normal CORS/PNA preflight davranışı çoğu senaryoda bunu zaten engellerdi (eşleşmeyen `Access-Control-Allow-Origin` preflight'ı başarısız kılar), ama bu "fail-open" bir tasarımdı — no-cors istekler, form gönderimleri veya beklenmedik bir tarayıcı/uzantı davranışı gibi kenar durumlarda isteğin Ollama'ya ULAŞMASI teorik olarak mümkündü.
+- [x] **Düzeltme — fail-closed tasarım:** Artık origin, HER İSTEKTE (OPTIONS dahil) en başta kontrol ediliyor; eşleşmiyorsa (ya da Origin header'ı hiç yoksa) istek Ollama'ya HİÇ gönderilmeden doğrudan `403` ile reddediliyor. Sadece `RELAY_ALLOWED_ORIGIN` (varsayılan `https://zdemir.tech`) ile tam eşleşen istekler Ollama'ya ulaşıyor.
+- [x] **Gerçek testle doğrulandı** (çalışan systemd servisi yeniden başlatılıp): `https://zdemir.tech` origin'i → 200, gerçek Ollama yanıtı. `https://evil.com` origin'i → 403, Ollama'ya hiç gidilmedi. Origin header'ı hiç olmayan istek → 403. Kötü niyetli origin'den gelen bir OPTIONS preflight → 403 (eskiden olduğu gibi 204 + PNA header'ı değil).
+- [x] Çalışan servis zaten yeniden başlatılıp düzeltilmiş haliyle aktif — ayrıca commit/push ile koda da yansıtıldı.
+
 ## Gelecek fikirleri (henüz plana alınmadı, sadece not)
 - Arka plan görselleri için otomatik/AI üretilen görsellere geçiş — Aşama 21'de bunun yerine sitenden doğrudan yükleme/silme (self-servis) tercih edildi, bu fikir hâlâ ayrı bir olasılık olarak (ör. hiç fotoğraf eklenmediğinde bir "varsayılan AI seti" gibi) not düşülüyor.
 - Anahtar kelimelerin kullanıcı içeriğinden otomatik çıkarılması (bkz. Aşama 11).

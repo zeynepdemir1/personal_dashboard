@@ -28,12 +28,7 @@ const ALLOWED_ORIGIN = process.env.RELAY_ALLOWED_ORIGIN || 'https://zdemir.tech'
 const ollamaTarget = new URL(OLLAMA_URL);
 
 function setCorsHeaders(req, res) {
-  const origin = req.headers.origin;
-  // Sadece izin verilen origin'e (varsayılan: zdemir.tech) yansıt —
-  // rastgele bir origin'e * ile açmak yerine somut bir allowlist.
-  if (origin === ALLOWED_ORIGIN) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
+  res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Private-Network', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -42,6 +37,22 @@ function setCorsHeaders(req, res) {
 }
 
 const server = http.createServer((req, res) => {
+  // GÜVENLİK — fail-closed: eskiden header'lar origin'e göre AYARLANIYOR
+  // ama istek origin ne olursa olsun yine de Ollama'ya YÖNLENDİRİLİYORDU.
+  // Tarayıcı CORS/PNA kontrolünü doğru uygulasa bile (okuma engellenir)
+  // bazı istek türlerinde (ör. no-cors, form gönderimi, ya da bir
+  // tarayıcı/uzantı CORS'u beklenmedik şekilde uygularsa) istek Ollama'ya
+  // ULAŞMIŞ olurdu. Artık origin eşleşmiyorsa istek Ollama'ya HİÇ
+  // gönderilmiyor, 403 ile doğrudan reddediliyor — tek doğrulanmış izin
+  // verilen origin (varsayılan zdemir.tech) dışında hiçbir origin'e asla
+  // proxy yapılmıyor.
+  const origin = req.headers.origin;
+  if (origin !== ALLOWED_ORIGIN) {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'origin not allowed' }));
+    return;
+  }
+
   setCorsHeaders(req, res);
 
   if (req.method === 'OPTIONS') {
