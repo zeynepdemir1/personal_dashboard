@@ -10,7 +10,7 @@ import {
 } from '../lib/data';
 import { makeLearnEntry, stripHtml, deriveFromHtml, type LearnEntry } from '../lib/learn';
 import { deriveTitleFromUrl } from '../lib/url';
-import { fetchGoogleCalendarEvents, type GCalEvent, type GCalSyncStatus } from '../lib/googleCalendar';
+import { fetchGoogleCalendarEvents, type GCalEvent, type GCalSource, type GCalSyncStatus } from '../lib/googleCalendar';
 import { analyzeDiscoveredProgram, pingOllama, summarizeLearnEntry } from '../lib/ollama';
 import { dismissProgram, fetchPendingPrograms, fetchRelevantPrograms, markFilteredPrograms, type DiscoveredProgram } from '../lib/discover';
 import { formatMonthDay, referenceToday, isoDateToDotDate, toDateKey } from '../lib/dates';
@@ -430,6 +430,7 @@ export interface AppStateValue {
 
   gcalStatus: GCalSyncStatus;
   gcalEvents: GCalEvent[];
+  gcalSources: GCalSource[];
 
   discoveredPrograms: DiscoveredProgram[];
   dismissDiscoveredProgram: (id: string) => void;
@@ -695,12 +696,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const [gcalStatus, setGcalStatus] = useState<GCalSyncStatus>('unconfigured');
   const [gcalEvents, setGcalEvents] = useState<GCalEvent[]>([]);
+  const [gcalSources, setGcalSources] = useState<GCalSource[]>([]);
   useEffect(() => {
     let cancelled = false;
     fetchGoogleCalendarEvents(GCAL_RANGE_START, GCAL_RANGE_END).then((res) => {
       if (cancelled) return;
       setGcalStatus(res.status);
       setGcalEvents(res.events);
+      setGcalSources(res.sources);
     });
     return () => {
       cancelled = true;
@@ -1355,6 +1358,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
       gcalStatus,
       gcalEvents,
+      gcalSources,
 
       discoveredPrograms,
       dismissDiscoveredProgram,
@@ -1398,6 +1402,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       linkDetailOpen,
       gcalStatus,
       gcalEvents,
+      gcalSources,
       discoveredPrograms,
     ],
   );

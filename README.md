@@ -129,6 +129,12 @@ gerçek anlık tarihine göre açılıyor). Google Calendar'daki gerçek
 etkinlikler salt-okunur olarak senkronize edilir ve yerel notlardan
 görsel olarak ayrılır (bkz.
 [Google Calendar salt-okunur kararı](#mimari-karar-2-google-calendar-salt-okunur)).
+**Birden fazla Google Calendar takvimi desteklenir** (bkz. PLAN.md Aşama
+31) — ör. ana takvim + ayrı bir "Dersler" takvimi aynı anda birleştirilip
+gösterilir; her takvimin etkinlikleri, Haftalık/Aylık program başlığındaki
+küçük bir renkli nokta + etiket çiftiyle ("● Takvim", "● Dersler") hangi
+takvimden geldiği ayırt edilebilecek şekilde farklı bir renkte çizilir
+(bkz. [Birden fazla takvim ekleme](#birden-fazla-google-calendar-takvimi-ekleme)).
 Bir güne tıklanınca not/ders eklenebilen, mevcut kayıtları düzenlenebilen
 (kalem ikonu) ve silinebilen (çöp kutusu ikonu) bir detay paneli açılır.
 
@@ -248,6 +254,28 @@ alınabiliyor. Bunun doğal sonucu: uygulamadan Google Calendar'a **geri
 yazma yok** — sadece okuma. Uygulama içinde eklenen not/dersler kendi
 durum kaydında (Upstash Redis) kalır, Google Calendar'a hiç gönderilmez.
 
+#### Birden fazla Google Calendar takvimi ekleme
+Tek bir `GCAL_ICS_URL` yerine (veya onunla birlikte) birden fazla takvim
+birleştirilip gösterilebilir — mantık `gcal-sources.js`'te tek bir yerde
+toplanmış, hem `vite.config.ts` (geliştirme) hem `server.js` (production)
+bunu aynı şekilde kullanıyor:
+
+- `GCAL_ICS_URL` her zaman **1. takvim** (zaten kurulu olan, değişiklik
+  gerektirmez). İsteğe bağlı bir `GCAL_ICS_URL_1_LABEL` ile etiketi
+  değiştirilebilir (yoksa sade "Takvim" etiketi kullanılır).
+- 2. ve sonraki her takvim için sıradaki numarayla **iki** değişken
+  eklenir: `GCAL_ICS_URL_2` (gizli iCal linki) ve `GCAL_ICS_URL_2_LABEL`
+  (arayüzde görünecek kısa etiket, ör. "Dersler"). 3. bir takvim için
+  `GCAL_ICS_URL_3`/`GCAL_ICS_URL_3_LABEL`, vb. — sınır yok, kodda hiçbir
+  değişiklik gerekmiyor.
+- Her takvim hem `.env.local`'e (yerel geliştirme) hem Render'ın
+  production ortam değişkenlerine eklenmelidir — ikisi birbirinden
+  bağımsız.
+- Arayüzde her takvimin etkinlikleri farklı bir renkte çizilir (1. takvim
+  gri/"steel", 2. takvim taupe, sonrası ikisi arasında döner) ve Haftalık/
+  Aylık program başlığında küçük bir "● etiket" listesiyle (2+ takvim
+  varken) hangi rengin hangi takvime ait olduğu gösterilir.
+
 ### Mimari Karar 3: Tek kullanıcı, merkezi deploy
 Bu proje "her kullanıcı kendi bilgisayarında kendi kopyasını çalıştırır"
 felsefesiyle DEĞİL, **tek kullanıcı + merkezi (Render'da barındırılan) bir
@@ -290,6 +318,7 @@ cp .env.example .env.local
 | `SITE_PASSWORD` | Kendiniz belirleyin — güçlü bir parola | **Evet** |
 | `SESSION_SECRET` | `node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"` ile üretin | **Evet** |
 | `GCAL_ICS_URL` | Google Calendar → Ayarlar → (takvim) → "Takvimi entegre et" → "iCal formatındaki gizli adres" | Hayır — yoksa takvim senkronizasyonu pasif kalır |
+| `GCAL_ICS_URL_2`, `GCAL_ICS_URL_2_LABEL`, ... | İkinci (ve sonraki) bir takvim eklemek için — bkz. [Birden fazla Google Calendar takvimi ekleme](#birden-fazla-google-calendar-takvimi-ekleme) | Hayır — sadece tek takvim kullanılıyorsa gerekmez |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | [cloudinary.com](https://cloudinary.com) → Dashboard (ücretsiz katman) | Hayır — yoksa fotoğraf yükleme çalışmaz |
 | `TELEGRAM_BOT_TOKEN` | Telegram'da @BotFather ile `/newbot` | Hayır — yoksa Telegram bildirimleri kapalı |
 | `TELEGRAM_CHAT_ID` | @userinfobot veya `https://api.telegram.org/bot<TOKEN>/getUpdates` | Hayır |

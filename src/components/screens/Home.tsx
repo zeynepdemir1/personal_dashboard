@@ -1,6 +1,6 @@
 import { useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useApp } from '../../state/AppState';
-import { colors, fonts, pillStyle, dayBlockStyle, gcalBlockStyle, HOUR_ROW_HEIGHT, MOBILE_BREAKPOINT } from '../../lib/theme';
+import { colors, fonts, pillStyle, dayBlockStyle, gcalBlockStyle, gcalColorForIndex, HOUR_ROW_HEIGHT, MOBILE_BREAKPOINT } from '../../lib/theme';
 import { LINKS, PROGRAMS, TOPICS, LINK_KINDS, timeToHour, TODAY } from '../../lib/data';
 import { computeHomeStats, computeClosedTopicsThisMonth } from '../../lib/stats';
 import {
@@ -569,6 +569,16 @@ export function Home() {
                   ? 'Google Calendar senkronizasyonu başarısız'
                   : 'Google Calendar bağlı değil'}
             </span>
+            {app.gcalSources.length > 1 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {app.gcalSources.map((s) => (
+                  <span key={s.index} style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: fonts.sans, fontSize: 10.5, color: colors.inkFaint }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: gcalColorForIndex(s.index).border }} />
+                    {s.label}
+                  </span>
+                ))}
+              </span>
+            )}
             <span
               onClick={() => app.openDayPanel(toDateKey(referenceToday()))}
               className="hover-underline"
@@ -691,6 +701,7 @@ function WeekView({ anchorDate }: { anchorDate: Date }) {
         s: ev.start.getHours() + ev.start.getMinutes() / 60,
         e: ev.end.getHours() + ev.end.getMinutes() / 60,
         label: ev.title,
+        calendarIndex: ev.calendarIndex,
       }))
       .filter((b) => b.s >= 8 && b.e <= 21);
 
@@ -759,7 +770,7 @@ function WeekView({ anchorDate }: { anchorDate: Date }) {
                 </div>
               ))}
               {d.gcalBlocks.map((b, j) => (
-                <div key={`g${j}`} style={gcalBlockStyle(b.s, b.e, split ? 'right' : 'full')}>
+                <div key={`g${j}`} style={gcalBlockStyle(b.s, b.e, split ? 'right' : 'full', b.calendarIndex)}>
                   {b.label}
                 </div>
               ))}
@@ -792,11 +803,12 @@ function MonthView({ anchorDate }: { anchorDate: Date }) {
     // silindiğinde takvimdeki görünüm otomatik güncellensin (bkz. PLAN.md).
     const programCount = valid ? app.extraPrograms.filter((p) => p.date === isoDateToDotDate(dateKey)).length : 0;
     const localCount = valid ? (app.dayNotes[dateKey] || []).length + programCount : 0;
-    const gcalCount = valid ? eventsOnDate(app.gcalEvents, year, month, dayNum).length : 0;
+    const gcalDayEvents = valid ? eventsOnDate(app.gcalEvents, year, month, dayNum) : [];
+    const localDotCount = Math.min(localCount, 4);
     return {
       day: valid ? dayNum : '',
-      localDots: Array.from({ length: Math.min(localCount, 4) }),
-      gcalDots: Array.from({ length: Math.min(gcalCount, 4 - Math.min(localCount, 4)) }),
+      localDots: Array.from({ length: localDotCount }),
+      gcalDots: gcalDayEvents.slice(0, 4 - localDotCount),
       open: valid ? () => app.openDayPanel(dateKey) : undefined,
       valid,
     };
@@ -833,8 +845,8 @@ function MonthView({ anchorDate }: { anchorDate: Date }) {
                   {c.localDots.map((_, j) => (
                     <span key={`l${j}`} style={{ width: 5, height: 5, borderRadius: '50%', background: colors.rose }} />
                   ))}
-                  {c.gcalDots.map((_, j) => (
-                    <span key={`g${j}`} style={{ width: 5, height: 5, borderRadius: '50%', background: colors.steel }} />
+                  {c.gcalDots.map((ev, j) => (
+                    <span key={`g${j}`} style={{ width: 5, height: 5, borderRadius: '50%', background: gcalColorForIndex(ev.calendarIndex).border }} />
                   ))}
                 </div>
               </>

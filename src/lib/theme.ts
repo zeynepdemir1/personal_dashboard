@@ -114,7 +114,23 @@ export function dayBlockStyle(s: number, e: number, column: BlockColumn = 'full'
 
 // Google Calendar'dan senkronize olan bloklar için ayrı stil — yerel
 // notlardan (pembe tonlar) görsel olarak ayrılsın diye steel/gri tonunda.
-export function gcalBlockStyle(s: number, e: number, column: BlockColumn = 'full'): CSSProperties {
+// Birden fazla takvim bağlandığında (bkz. PLAN.md Aşama 31) hangi
+// etkinliğin hangi takvimden geldiği, `calendarIndex`'e göre seçilen bu
+// paletle (sınır rengi) ayırt edilebiliyor — 1. takvim (ana takvim) eskisi
+// gibi steel/gri, 2. takvim (ör. "Dersler") taupe, sonrası ikisi arasında
+// döner. Yeni bir renk eklemeksizin (CSS değişkeni gerektirmeden) sadece
+// zaten var olan iki renk arasında dönerek büyümeye açık bırakılıyor.
+const GCAL_PALETTE: { bg: string; border: string }[] = [
+  { bg: 'rgba(157,163,164,0.18)', border: colors.steel },
+  { bg: 'rgba(96,77,83,0.16)', border: colors.taupe },
+];
+
+export function gcalColorForIndex(calendarIndex: number): { bg: string; border: string } {
+  return GCAL_PALETTE[(calendarIndex - 1) % GCAL_PALETTE.length];
+}
+
+export function gcalBlockStyle(s: number, e: number, column: BlockColumn = 'full', calendarIndex = 1): CSSProperties {
+  const palette = gcalColorForIndex(calendarIndex);
   return {
     position: 'absolute',
     boxSizing: 'border-box',
@@ -130,8 +146,8 @@ export function gcalBlockStyle(s: number, e: number, column: BlockColumn = 'full
     WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical',
     zIndex: 1,
-    background: 'rgba(157,163,164,0.18)',
+    background: palette.bg,
     color: colors.inkSoft,
-    border: `1px dashed ${colors.steel}`,
+    border: `1px dashed ${palette.border}`,
   };
 }

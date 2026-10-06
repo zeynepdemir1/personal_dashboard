@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { v2 as cloudinary } from 'cloudinary';
+import { getGcalSources } from './gcal-sources.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -39,7 +40,7 @@ function loadLocalEnvFile() {
 loadLocalEnvFile();
 
 const PORT = process.env.PORT || 3000;
-const GCAL_ICS_URL = process.env.GCAL_ICS_URL;
+const GCAL_SOURCES = getGcalSources(process.env);
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -431,10 +432,24 @@ app.post('/api/logout', (_req, res) => {
   res.json({ ok: true });
 });
 
-if (GCAL_ICS_URL) {
-  app.get('/api/calendar.ics', async (_req, res) => {
+if (GCAL_SOURCES.length > 0) {
+  // Zeynep birden fazla takvim (ör. ana takvim + "Dersler") ekleyebiliyor
+  // (bkz. PLAN.md Aşama 31, gcal-sources.js) — istemci önce bu listeyi
+  // çekip hangi takvimlerin yapılandırılı olduğunu (index + etiket)
+  // öğreniyor, sonra her biri için ayrı bir `?cal=<index>` isteği atıyor.
+  app.get('/api/calendars', (_req, res) => {
+    res.json({ calendars: GCAL_SOURCES.map(({ index, label }) => ({ index, label })) });
+  });
+
+  app.get('/api/calendar.ics', async (req, res) => {
+    const index = Number(req.query.cal) || 1;
+    const source = GCAL_SOURCES.find((s) => s.index === index);
+    if (!source) {
+      res.status(404).end();
+      return;
+    }
     try {
-      const upstream = await fetch(GCAL_ICS_URL, { signal: AbortSignal.timeout(10000) });
+      const upstream = await fetch(source.url, { signal: AbortSignal.timeout(10000) });
       if (!upstream.ok) {
         res.status(502).end();
         return;
