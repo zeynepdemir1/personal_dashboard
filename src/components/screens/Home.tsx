@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useApp } from '../../state/AppState';
-import { colors, fonts, pillStyle, dayBlockStyle, gcalBlockStyle, gcalColorForIndex, HOUR_ROW_HEIGHT, MOBILE_BREAKPOINT } from '../../lib/theme';
+import { colors, fonts, pillStyle, weekBlockStyle, gcalColorForIndex, HOUR_ROW_HEIGHT, MOBILE_BREAKPOINT } from '../../lib/theme';
+import { layoutOverlappingEvents } from '../../lib/calendarLayout';
 import { LINKS, PROGRAMS, TOPICS, LINK_KINDS, timeToHour, TODAY } from '../../lib/data';
 import { computeHomeStats, computeClosedTopicsThisMonth } from '../../lib/stats';
 import {
@@ -687,30 +688,37 @@ function WeekView({ anchorDate }: { anchorDate: Date }) {
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(weekStart, i);
     const dateKey = toDateKey(date);
-    const rawBlocks = (app.dayNotes[dateKey] || [])
+    const localItems = (app.dayNotes[dateKey] || [])
       .filter((it) => it.time)
-      .map((it) => ({
-        s: timeToHour(it.time) as number,
-        e: it.end ? (timeToHour(it.end) as number) : (timeToHour(it.time) as number) + 1,
-        label: it.label,
-      }));
+      .map((it, j) => {
+        const s = timeToHour(it.time) as number;
+        const e = it.end ? (timeToHour(it.end) as number) : s + 1;
+        return { key: `local-${j}`, s, e, label: it.label, source: { kind: 'local' as const, long: e - s >= 1.25 } };
+      });
 
-    const gcalBlocks = eventsOnDate(app.gcalEvents, date.getFullYear(), date.getMonth(), date.getDate())
+    const gcalItems = eventsOnDate(app.gcalEvents, date.getFullYear(), date.getMonth(), date.getDate())
       .filter((ev) => !ev.allDay)
-      .map((ev) => ({
+      .map((ev, j) => ({
+        key: `gcal-${j}`,
         s: ev.start.getHours() + ev.start.getMinutes() / 60,
         e: ev.end.getHours() + ev.end.getMinutes() / 60,
         label: ev.title,
-        calendarIndex: ev.calendarIndex,
+        source: { kind: 'gcal' as const, calendarIndex: ev.calendarIndex },
       }))
       .filter((b) => b.s >= 8 && b.e <= 21);
+
+    // Kaynağı ne olursa olsun (yerel not, ana takvim, Dersler takvimi, ...)
+    // TÜM günün etkinlikleri birlikte düzenleniyor — ikiden fazla ya da
+    // aynı kaynaktan gelen çakışmalar da artık doğru şekilde yan yana
+    // diziliyor (bkz. PLAN.md Aşama 32, Aşama 9'daki eski "sadece yerel +
+    // tek gcal" 48/48 bölmesinin yerine).
+    const items = layoutOverlappingEvents([...localItems, ...gcalItems]);
 
     return {
       label: WEEKDAY_LABELS[i],
       date: `${date.getDate()} ${MONTH_ABBR_TR[date.getMonth()]}`,
       dateKey,
-      blocks: rawBlocks,
-      gcalBlocks,
+      items,
     };
   });
 
@@ -761,17 +769,15 @@ function WeekView({ anchorDate }: { anchorDate: Date }) {
         }}
       >
         {weekDays.map((d, i) => {
-          const split = d.blocks.length > 0 && d.gcalBlocks.length > 0;
           return (
             <div key={i} style={{ position: 'relative', borderLeft: '1px solid #EEDFDF' }}>
-              {d.blocks.map((b, j) => (
-                <div key={j} style={dayBlockStyle(b.s, b.e, split ? 'left' : 'full')}>
-                  {b.label}
-                </div>
-              ))}
-              {d.gcalBlocks.map((b, j) => (
-                <div key={`g${j}`} style={gcalBlockStyle(b.s, b.e, split ? 'right' : 'full', b.calendarIndex)}>
-                  {b.label}
+              {d.items.map((it) => (
+                <div
+                  key={it.key}
+                  title={it.label}
+                  style={weekBlockStyle(it.s, it.e, it.columnIndex, it.columnCount, it.source)}
+                >
+                  {it.label}
                 </div>
               ))}
             </div>

@@ -543,6 +543,20 @@ Zeynep Google Calendar'da ayrı bir "Dersler" takvimi oluşturdu (kendi gizli iC
   GCAL_ICS_URL_2_LABEL=Dersler
   ```
 
+## Aşama 32 — Haftalık Takvimde Genel Çakışma Yerleşimi ✅
+
+Zeynep gerçek ders programıyla test ederken bildirdi: 8 Ekim Perşembe 13:00'te iki ders ("MRM3001 - PLC (Lab)" ~13:00-14:45 ve "MRM2005 - Sayısal Sistemler" ~13:00-16:45) aynı kutuda üst üste biniyor, okunamıyordu — ders programı olduğu için bu her hafta tekrarlanacak bir sorun.
+
+- [x] **Kök neden:** Aşama 9'daki mantık (`split = d.blocks.length > 0 && d.gcalBlocks.length > 0`) sadece "yerel not + Google etkinliği" ikilisini 48/48 bölüyordu. AYNI kaynaktan (iki Dersler etkinliği) gelen ya da ikiden fazla çakışan etkinlikler bu mantığın kapsamı DIŞINDAYDI — hepsi aynı tam-genişlik kutuda üst üste çiziliyordu.
+- [x] **Genel çözüm — `src/lib/calendarLayout.ts` (yeni):** Google Calendar'ın kullandığı standart algoritma: bir günün TÜM etkinlikleri (kaynağı ne olursa olsun) zamana göre sıralanır, çakışanlar "küme"lere ayrılır (zincirleme çakışmalar da — A-B ve B-C çakışıp A-C çakışmıyorsa bile — aynı kümede, ama A ile C aynı sütunu paylaşabilir), her kümede gereken minimum sütun sayısı hesaplanır. 7 senaryoyla (bildirilen hata dahil, 3'lü çakışma, zincirleme çakışma, bitişik-ama-çakışmayan, aynı günde iki ayrı küme) birim test edildi.
+- [x] **`theme.ts`:** Eski `dayBlockStyle`/`gcalBlockStyle`/`BlockColumn`/`columnPosition` (sabit 48/48) kaldırıldı, yerine tek bir `weekBlockStyle(s, e, columnIndex, columnCount, source)` geldi — `columnCount` sütunu yüzdeye göre eşit böler. Çakışma YOKSA (`columnCount === 1`) kaynağa göre eski renk korunur (yerel not: uzun/kısa tonu, gcal: takvime göre steel/taupe — bkz. Aşama 31). Çakışma VARSA kaynak fark etmeksizin sütun sırasına göre mevcut 5 renkli paletten (Soft Blush, Old Rose, Pale Slate, Cool Steel, Taupe Grey) farklı bir ton atanır (`OVERLAP_PALETTE`) — yeni/uyumsuz bir renk eklenmedi.
+- [x] **Okunabilirlik:** Metin hâlâ `WebkitLineClamp: 2` ile taşmadan kırpılıp "…" ile bitiyor; her bloğa native `title` attribute eklendi (fare üzerine gelince tam ad tooltip'te görünüyor) — dar sütunlarda bile tam ad bir tıklama/hover ile erişilebilir.
+- [x] **Ay görünümü ve gün paneli etkilenmedi:** `MonthView`'daki noktalar (`gcalColorForIndex`) ve `DayPanel.tsx` bu değişikliğe hiç dokunmadı (koddan doğrulandı — ikisi de kaldırılan/değişen sembollere referans vermiyor); gün paneli zaten çakışan notları ayrı satırlar halinde listeliyor.
+- [x] **Gerçek uçtan uca doğrulama (iki katmanlı):**
+  1. Tarayıcıda gerçek "Dersler" verisiyle (geçici test, kalıcı değişiklik yapılmadan — bkz. Aşama 31'deki aynı güvenli test deseni): bildirilen 8 Ekim çakışması artık iki ayrı renkli sütunda (Soft Blush + Old Rose tonları), yan yana, okunaklı görünüyor; `title` attribute'larının tam ders adını taşıdığı DOM'dan doğrulandı; önceki/sonraki haftalar (Eylül ortası — Ekim sonu) gezilip hiçbir üst üste binme kalmadığı gözle doğrulandı.
+  2. **Kapsamlı otomatik doğrulama:** gerçek `ical.js` kütüphanesiyle HER İKİ takvimin gerçek ICS verisi (2024-2029 aralığı, 438 etkinlik) + gerçek `app:state`'teki yerel notlar (salt-okunur, Redis'e hiç yazılmadan) parse edilip aynı yerleştirme algoritmasından geçirildi: 153 etkinlik içeren günden 21'inde gerçek çakışma var, bunların HİÇBİRİNDE aynı sütunu paylaşan iki çakışan etkinlik yok, sütun sayısı her zaman gerçek eşzamanlı maksimuma eşit/fazla — **0 ihlal**.
+- [x] `tsc --noEmit`/`vite build` temiz. Test için `.env.local`'e eklenen `GCAL_ICS_URL_2` geçici satırı ve test sunucusu temizlendi, kalıcı hiçbir değişiklik yapılmadı.
+
 ## Gelecek fikirleri (henüz plana alınmadı, sadece not)
 - Arka plan görselleri için otomatik/AI üretilen görsellere geçiş — Aşama 21'de bunun yerine sitenden doğrudan yükleme/silme (self-servis) tercih edildi, bu fikir hâlâ ayrı bir olasılık olarak (ör. hiç fotoğraf eklenmediğinde bir "varsayılan AI seti" gibi) not düşülüyor.
 - Anahtar kelimelerin kullanıcı içeriğinden otomatik çıkarılması (bkz. Aşama 11).

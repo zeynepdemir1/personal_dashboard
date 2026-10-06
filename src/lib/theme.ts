@@ -77,49 +77,16 @@ export function navItemStyle(active: boolean): CSSProperties {
 // için 56'dan 64'e çıkarıldı — bkz. PLAN.md Aşama 9).
 export const HOUR_ROW_HEIGHT = 64;
 
-// Bir gün sütununda hem yerel not hem Google Calendar etkinliği aynı ana
-// denk gelebiliyor (gerçek bir takvimle test edince görüldü) — 'split'
-// ikisini yan yana yarım genişlikte gösterir, 'full' tek kaynak varken
-// tüm genişliği kullanır.
-export type BlockColumn = 'full' | 'left' | 'right';
-
-function columnPosition(column: BlockColumn): CSSProperties {
-  if (column === 'left') return { left: 0, width: '48%' };
-  if (column === 'right') return { right: 0, width: '48%' };
-  return { left: 0, right: 0 };
-}
-
-export function dayBlockStyle(s: number, e: number, column: BlockColumn = 'full'): CSSProperties {
-  const long = e - s >= 1.25;
-  return {
-    position: 'absolute',
-    boxSizing: 'border-box',
-    ...columnPosition(column),
-    top: (s - 8) * HOUR_ROW_HEIGHT,
-    height: (e - s) * HOUR_ROW_HEIGHT - 4,
-    padding: '6px 10px',
-    borderRadius: 4,
-    fontSize: 11.5,
-    lineHeight: 1.32,
-    overflow: 'hidden',
-    display: '-webkit-box',
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: 'vertical',
-    zIndex: 1,
-    background: long ? colors.chipBg : '#F1E9E9',
-    color: long ? colors.chipText : colors.inkSoft,
-    border: long ? '1px solid #F0BFC0' : `1px dashed ${colors.borderStrong}`,
-  };
-}
-
-// Google Calendar'dan senkronize olan bloklar için ayrı stil — yerel
+// Google Calendar'dan senkronize olan bloklar için ayrı renk — yerel
 // notlardan (pembe tonlar) görsel olarak ayrılsın diye steel/gri tonunda.
 // Birden fazla takvim bağlandığında (bkz. PLAN.md Aşama 31) hangi
 // etkinliğin hangi takvimden geldiği, `calendarIndex`'e göre seçilen bu
 // paletle (sınır rengi) ayırt edilebiliyor — 1. takvim (ana takvim) eskisi
 // gibi steel/gri, 2. takvim (ör. "Dersler") taupe, sonrası ikisi arasında
 // döner. Yeni bir renk eklemeksizin (CSS değişkeni gerektirmeden) sadece
-// zaten var olan iki renk arasında dönerek büyümeye açık bırakılıyor.
+// zaten var olan iki renk arasında dönerek büyümeye açık bırakılıyor. Bu
+// fonksiyon hâlâ kaynağa göre (çakışma YOKKEN) renklendirme ve ay
+// görünümündeki noktalar/üstteki etiket için kullanılıyor.
 const GCAL_PALETTE: { bg: string; border: string }[] = [
   { bg: 'rgba(157,163,164,0.18)', border: colors.steel },
   { bg: 'rgba(96,77,83,0.16)', border: colors.taupe },
@@ -129,12 +96,68 @@ export function gcalColorForIndex(calendarIndex: number): { bg: string; border: 
   return GCAL_PALETTE[(calendarIndex - 1) % GCAL_PALETTE.length];
 }
 
-export function gcalBlockStyle(s: number, e: number, column: BlockColumn = 'full', calendarIndex = 1): CSSProperties {
-  const palette = gcalColorForIndex(calendarIndex);
+// Haftalık takvimde bir günde İKİ YA DA DAHA FAZLA etkinlik aynı saate
+// denk geldiğinde (kaynağı ne olursa olsun — bkz. PLAN.md Aşama 32,
+// calendarLayout.ts) her biri mevcut 5 renkli paletten (Soft Blush, Old
+// Rose, Pale Slate, Cool Steel, Taupe Grey) FARKLI bir ton alır, böylece
+// hangi kutunun hangi etkinliğe ait olduğu "kaynağa göre renk"ten
+// bağımsız olarak da ayırt edilebilir. Sütun sayısı 5'i geçerse (çok
+// nadir) baştan döner.
+const OVERLAP_PALETTE: { bg: string; border: string; text: string }[] = [
+  { bg: colors.chipBg, border: colors.rose, text: colors.chipText },
+  { bg: 'rgba(219,127,142,0.24)', border: colors.rose, text: colors.ink },
+  { bg: 'rgba(213,197,200,0.5)', border: colors.borderStrong, text: colors.ink },
+  { bg: 'rgba(157,163,164,0.22)', border: colors.steel, text: colors.inkSoft },
+  { bg: 'rgba(96,77,83,0.2)', border: colors.taupe, text: colors.inkSoft },
+];
+
+function overlapColorForColumn(columnIndex: number): { bg: string; border: string; text: string } {
+  return OVERLAP_PALETTE[columnIndex % OVERLAP_PALETTE.length];
+}
+
+// Haftalık takvimdeki TEK bir blok kaynağı: yerel bir not/ders (süresine
+// göre "uzun"/"kısa" iki tonu vardı) ya da bir Google Calendar etkinliği
+// (hangi takvimden geldiğine göre renkli).
+export type WeekBlockSource = { kind: 'local'; long: boolean } | { kind: 'gcal'; calendarIndex: number };
+
+// Bir günde çakışan TÜM etkinlikler (kaynağı ne olursa olsun) artık tek
+// bir genel sütun yerleşimi paylaşıyor (bkz. calendarLayout.ts). Çakışma
+// yoksa (columnCount === 1) her kaynak kendi eski rengini korur; çakışma
+// varsa (columnCount > 1) kaynağa bakılmaksızın sütun sırasına göre
+// OVERLAP_PALETTE'ten bir ton atanır — aynı kümedeki hiçbir iki etkinlik
+// aynı rengi almaz.
+export function weekBlockStyle(
+  s: number,
+  e: number,
+  columnIndex: number,
+  columnCount: number,
+  source: WeekBlockSource,
+): CSSProperties {
+  let background: string;
+  let color: string;
+  let border: string;
+
+  if (columnCount > 1) {
+    const p = overlapColorForColumn(columnIndex);
+    background = p.bg;
+    color = p.text;
+    border = `1px solid ${p.border}`;
+  } else if (source.kind === 'local') {
+    background = source.long ? colors.chipBg : '#F1E9E9';
+    color = source.long ? colors.chipText : colors.inkSoft;
+    border = source.long ? '1px solid #F0BFC0' : `1px dashed ${colors.borderStrong}`;
+  } else {
+    const p = gcalColorForIndex(source.calendarIndex);
+    background = p.bg;
+    color = colors.inkSoft;
+    border = `1px dashed ${p.border}`;
+  }
+
   return {
     position: 'absolute',
     boxSizing: 'border-box',
-    ...columnPosition(column),
+    left: `calc(${(columnIndex / columnCount) * 100}% + ${columnIndex > 0 ? 2 : 0}px)`,
+    width: `calc(${(1 / columnCount) * 100}% - 2px)`,
     top: (s - 8) * HOUR_ROW_HEIGHT,
     height: Math.max((e - s) * HOUR_ROW_HEIGHT - 4, 16),
     padding: '6px 10px',
@@ -146,8 +169,8 @@ export function gcalBlockStyle(s: number, e: number, column: BlockColumn = 'full
     WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical',
     zIndex: 1,
-    background: palette.bg,
-    color: colors.inkSoft,
-    border: `1px dashed ${palette.border}`,
+    background,
+    color,
+    border,
   };
 }
