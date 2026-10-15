@@ -1,4 +1,4 @@
-/* Portfolyo – dil geçişi, proje sekmeleri, beceri kartı, deneyim akordiyonu.
+/* Portfolyo – parçacık motoru, dil geçişi, proje sekmeleri, beceri kartı, deneyim akordiyonu.
    Tüm içerik burada sabit olarak tanımlı; DOM yalnızca textContent ile doldurulur. */
 (function () {
   'use strict';
@@ -6,13 +6,12 @@
   var UI = {
     tr: {
       title: 'Hatice Zeynep Demir – Portfolyo',
-      docLabel: 'PORTFOLYO · REV. 2026.10',
+      
       role: 'Mekatronik Mühendisliği öğrencisi',
       intro: "Marmara Üniversitesi'nde mekatronik mühendisliği okuyorum. Gömülü sistemler, görüntü işleme ve yapay zekâ destekli yazılım üzerinde projeler geliştiriyorum; uzun vadeli ilgim sağlık teknolojileri ve biyomekatronik.",
-      emailBtn: 'E-posta gönder',
-      figTitle: 'ŞEKİL 1 — KAPALI ÇEVRİM DENETİM',
-      figAlt: 'Kapalı çevrim denetim blok diyagramı: referans, kontrolcü, süreç ve sensör geri beslemesi',
-      s1: 'Projeler', s2: 'Deneyim', s3: 'Beceriler', s4label: '4.0 · İLETİŞİM',
+      emailBtn: 'E-posta gönder', navCta: 'İletişim', shapeLabel: 'İLGİ ALANI', shapeAria: 'İlgi alanına göre şekil seç',
+      shapes: ['Mekatronik', 'Yapay zekâ', 'Model uydu'],
+      s1: 'Projeler', s2: 'Deneyim', s3: 'Beceriler', s4label: '04 · İLETİŞİM',
       hint1: 'Bir proje seçin', hint2: 'Ayrıntı için satıra tıklayın', hint3: 'Bir beceriye gelin veya dokunun',
       stackKey: 'TEKNİK',
       specLabel: 'BECERİ KARTI',
@@ -21,24 +20,19 @@
       contactText: 'Staj, proje ve araştırma fırsatları için e-posta ile ulaşabilirsiniz.',
       nav: [
         { label: 'Projeler', href: '#projects' }, { label: 'Deneyim', href: '#experience' },
-        { label: 'Beceriler', href: '#skills' }, { label: 'İletişim', href: '#contact' }
-      ],
-      cells: [
-        ['ÖĞRENCİ', 'Hatice Zeynep Demir'], ['BÖLÜM', 'Mekatronik Müh.'], ['ÜNİVERSİTE', 'Marmara Üniv.'],
-        ['SINIF', '3. sınıf'], ['MEZUNİYET', '2028'], ['DİLLER', 'TR · EN (B1)']
+        { label: 'Beceriler', href: '#skills' }
       ],
       groups: ['GÖMÜLÜ SİSTEMLER', 'YAZILIM VE YAPAY ZEKÂ', 'MÜHENDİSLİK ARAÇLARI'],
       keys: ['PROBLEM', 'ÇÖZÜM', 'DURUM']
     },
     en: {
       title: 'Hatice Zeynep Demir – Portfolio',
-      docLabel: 'PORTFOLIO · REV. 2026.10',
+      
       role: 'Mechatronics Engineering student',
       intro: 'I study mechatronics engineering at Marmara University. I build projects in embedded systems, computer vision and AI-assisted software, with a long-term interest in health technologies and biomechatronics.',
-      emailBtn: 'Send an email',
-      figTitle: 'FIG. 1 — CLOSED-LOOP CONTROL',
-      figAlt: 'Closed-loop control block diagram: reference, controller, plant and sensor feedback',
-      s1: 'Projects', s2: 'Experience', s3: 'Skills', s4label: '4.0 · CONTACT',
+      emailBtn: 'Send an email', navCta: 'Contact', shapeLabel: 'FOCUS', shapeAria: 'Pick a shape by focus area',
+      shapes: ['Mechatronics', 'AI', 'Model satellite'],
+      s1: 'Projects', s2: 'Experience', s3: 'Skills', s4label: '04 · CONTACT',
       hint1: 'Select a project', hint2: 'Click a row for details', hint3: 'Hover or tap a skill',
       stackKey: 'STACK',
       specLabel: 'SKILL CARD',
@@ -47,11 +41,7 @@
       contactText: 'For internships, projects and research opportunities, feel free to reach out by email.',
       nav: [
         { label: 'Projects', href: '#projects' }, { label: 'Experience', href: '#experience' },
-        { label: 'Skills', href: '#skills' }, { label: 'Contact', href: '#contact' }
-      ],
-      cells: [
-        ['STUDENT', 'Hatice Zeynep Demir'], ['DEPARTMENT', 'Mechatronics Eng.'], ['UNIVERSITY', 'Marmara Univ.'],
-        ['YEAR', 'Year 3'], ['GRADUATION', '2028'], ['LANGUAGES', 'TR · EN (B1)']
+        { label: 'Skills', href: '#skills' }
       ],
       groups: ['EMBEDDED SYSTEMS', 'SOFTWARE AND AI', 'ENGINEERING TOOLS'],
       keys: ['PROBLEM', 'SOLUTION', 'STATUS']
@@ -159,10 +149,250 @@
     { id: 'lan', g: 2, lvl: 'a', tr: ['LAN / SMB ağı', 'CNC makineleri ile ofis bilgisayarları arasında dosya paylaşımı kurdum.'], en: ['LAN / SMB networking', 'Set up file sharing between CNC machines and office PCs.'] }
   ];
 
+  // Parçacık motoru: dişli → sinir ağı → model uydu arasında şekil değiştirir.
+  function startEngine(canvas, initialShape, onAuto) {
+          let ctx = null;
+      try { ctx = canvas.getContext('2d'); } catch (e) { ctx = null; }
+      if (!ctx) { return; }
+      const N = 1500;
+      const TAU = Math.PI * 2;
+      let reduce = false;
+      try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { reduce = false; }
+
+      let seed = 11;
+      const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+      const finish = (pts, s) => {
+        const out = new Float32Array(N * 3);
+        for (let i = 0; i < N; i++) {
+          out[i * 3] = pts[i * 3] * s; out[i * 3 + 1] = pts[i * 3 + 1] * s; out[i * 3 + 2] = pts[i * 3 + 2] * s;
+        }
+        return out;
+      };
+
+      const gear = () => {
+        const p = [];
+        const teeth = 12;
+        for (let i = 0; i < N; i++) {
+          const u = i / N;
+          let x, y, z;
+          if (u < 0.62) {
+            const th = rnd() * TAU;
+            const seg = ((th / TAU) * teeth) % 1;
+            const tooth = (seg > 0.12 && seg < 0.46) ? 0.22 : 0;
+            const rr = 0.62 + rnd() * (0.36 + tooth);
+            x = Math.cos(th) * rr; y = Math.sin(th) * rr; z = (rnd() - 0.5) * 0.34;
+          } else if (u < 0.8) {
+            const th = rnd() * TAU; const rr = 0.16 + rnd() * 0.14;
+            x = Math.cos(th) * rr; y = Math.sin(th) * rr; z = (rnd() - 0.5) * 0.44;
+          } else {
+            const a = Math.floor(rnd() * 4) * (TAU / 4) + 0.4;
+            const t = 0.3 + rnd() * 0.34; const j = (rnd() - 0.5) * 0.1;
+            x = Math.cos(a) * t - Math.sin(a) * j; y = Math.sin(a) * t + Math.cos(a) * j; z = (rnd() - 0.5) * 0.2;
+          }
+          p.push(x, y, z);
+        }
+        return finish(p, 1.05);
+      };
+
+      const net = () => {
+        const layers = [4, 6, 6, 3];
+        const nodes = [];
+        for (let l = 0; l < layers.length; l++) {
+          const n = layers[l]; const arr = [];
+          for (let k = 0; k < n; k++) {
+            const a = (k / n) * TAU + l * 0.5; const r = 0.36 + n * 0.07;
+            arr.push([(l / (layers.length - 1) - 0.5) * 2.3, Math.cos(a) * r, Math.sin(a) * r]);
+          }
+          nodes.push(arr);
+        }
+        const edges = [];
+        for (let l = 0; l < layers.length - 1; l++) {
+          for (let a = 0; a < nodes[l].length; a++) {
+            for (let b = 0; b < nodes[l + 1].length; b++) { edges.push([nodes[l][a], nodes[l + 1][b]]); }
+          }
+        }
+        const flat = [];
+        nodes.forEach((arr) => arr.forEach((q) => flat.push(q)));
+        const p = [];
+        const nodePts = Math.floor(N * 0.14);
+        const edgePts = N - nodePts;
+        for (let i = 0; i < edgePts; i++) {
+          const e = edges[i % edges.length]; const t = rnd();
+          p.push(e[0][0] + (e[1][0] - e[0][0]) * t + (rnd() - 0.5) * 0.02, e[0][1] + (e[1][1] - e[0][1]) * t + (rnd() - 0.5) * 0.02, e[0][2] + (e[1][2] - e[0][2]) * t + (rnd() - 0.5) * 0.02);
+        }
+        for (let i = 0; i < nodePts; i++) {
+          const q = flat[i % flat.length];
+          p.push(q[0] + (rnd() - 0.5) * 0.07, q[1] + (rnd() - 0.5) * 0.07, q[2] + (rnd() - 0.5) * 0.07);
+        }
+        return finish(p, 0.95);
+      };
+
+      const sat = () => {
+        const p = [];
+        for (let i = 0; i < N; i++) {
+          const u = i / N;
+          let x, y, z;
+          if (u < 0.3) {
+            const hx = 0.28, hy = 0.28, hz = 0.4; const f = Math.floor(rnd() * 6);
+            x = (rnd() * 2 - 1) * hx; y = (rnd() * 2 - 1) * hy; z = (rnd() * 2 - 1) * hz;
+            if (f === 0) { x = hx; } else if (f === 1) { x = -hx; } else if (f === 2) { y = hy; } else if (f === 3) { y = -hy; } else if (f === 4) { z = hz; } else { z = -hz; }
+          } else if (u < 0.68) {
+            const side = rnd() < 0.5 ? -1 : 1;
+            x = side * (0.45 + rnd() * 1.0); y = (rnd() * 2 - 1) * 0.3; z = (rnd() - 0.5) * 0.02;
+            if (rnd() < 0.5) { x = side * (0.45 + Math.round(rnd() * 10) * 0.1); } else { y = Math.round((rnd() * 2 - 1) * 3) * 0.1; }
+          } else if (u < 0.74) {
+            x = 0; y = 0.3 + rnd() * 0.55; z = 0;
+          } else if (u < 0.8) {
+            const th = rnd() * TAU; x = Math.cos(th) * 0.14; y = 0.86 + Math.sin(th) * 0.05; z = Math.sin(th) * 0.14;
+          } else {
+            const th = rnd() * TAU; const R = 1.7;
+            x = Math.cos(th) * R; y = Math.sin(th) * R * Math.sin(0.5); z = Math.sin(th) * R * Math.cos(0.5);
+          }
+          p.push(x, y, z);
+        }
+        return finish(p, 0.82);
+      };
+
+      const shapes = [gear(), net(), sat()];
+      const pos = new Float32Array(N * 3);
+      const col = new Uint8Array(N);
+      const spd = new Float32Array(N);
+      const PAL = ['255,219,218', '219,127,142', '213,197,200', '157,163,164'];
+      const WEIGHTS = [0.36, 0.3, 0.2, 0.14];
+      for (let i = 0; i < N; i++) {
+        pos[i * 3] = (rnd() - 0.5) * 5; pos[i * 3 + 1] = (rnd() - 0.5) * 5; pos[i * 3 + 2] = (rnd() - 0.5) * 5;
+        const r = rnd(); let acc = 0; let c = 0;
+        for (let k = 0; k < WEIGHTS.length; k++) { acc += WEIGHTS[k]; if (r <= acc) { c = k; break; } }
+        col[i] = c; spd[i] = 0.6 + rnd() * 0.9;
+      }
+      const tris = [];
+      for (let i = 0; i < 26; i++) {
+        tris.push({ x: rnd(), y: rnd(), s: 5 + rnd() * 11, r: rnd() * TAU, vr: (rnd() - 0.5) * 0.5, vx: (rnd() - 0.5) * 0.012, vy: (rnd() - 0.5) * 0.012, c: Math.floor(rnd() * 4), f: rnd() < 0.3, z: 0.4 + rnd() * 1.2 });
+      }
+
+      let cur = initialShape || 0;
+      let target = shapes[cur];
+      let W = 1, H = 1, dpr = 1;
+      let mx = 0, my = 0, smx = 0, smy = 0;
+      let raf = 0;
+      let lastSwitch = performance.now();
+      let lastInteract = -1e9;
+      let alive = true;
+
+      const resize = () => {
+        const par = canvas.parentNode;
+        if (!par) { return; }
+        const r = par.getBoundingClientRect();
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        W = Math.max(1, r.width); H = Math.max(1, r.height);
+        canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+      };
+      const onMove = (e) => {
+        const r = canvas.getBoundingClientRect();
+        mx = Math.max(-1, Math.min(1, ((e.clientX - r.left) / Math.max(1, r.width)) * 2 - 1));
+        my = Math.max(-1, Math.min(1, ((e.clientY - r.top) / Math.max(1, r.height)) * 2 - 1));
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('resize', resize);
+      resize();
+
+      const setShape = (i, auto) => {
+        cur = i; target = shapes[i];
+        const now = performance.now();
+        lastSwitch = now;
+        if (!auto) { lastInteract = now; }
+        if (reduce) { for (let k = 0; k < N * 3; k++) { pos[k] = target[k]; } }
+      };
+
+      const tri = (x, y, s, rot) => {
+        ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+        ctx.beginPath(); ctx.moveTo(0, -s); ctx.lineTo(s * 0.87, s * 0.5); ctx.lineTo(-s * 0.87, s * 0.5); ctx.closePath();
+        ctx.restore();
+      };
+
+      const frame = (now) => {
+        if (!alive) { return; }
+        raf = requestAnimationFrame(frame);
+        const t = now / 1000;
+        if (!reduce && now - lastInteract > 12000 && now - lastSwitch > 5600) {
+          const nx = (cur + 1) % shapes.length;
+          setShape(nx, true);
+          if (onAuto) { onAuto(nx); }
+        }
+        smx += (mx - smx) * 0.05; smy += (my - smy) * 0.05;
+        const ay = reduce ? 0.5 : t * 0.28 + smx * 0.55;
+        const ax = -0.28 + smy * 0.3;
+        const cy_ = Math.cos(ay), sy_ = Math.sin(ay), cx_ = Math.cos(ax), sx_ = Math.sin(ax);
+        const wide = W > 900;
+        const cx = wide ? W * 0.7 : W * 0.5;
+        const cy = H * 0.5;
+        const scale = Math.min(H * 0.3, W * (wide ? 0.17 : 0.28));
+        const k0 = reduce ? 1 : 0.055;
+
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+
+        ctx.lineWidth = 1;
+        for (let i = 0; i < tris.length; i++) {
+          const q = tris[i];
+          if (!reduce) {
+            q.x += q.vx * 0.016; q.y += q.vy * 0.016; q.r += q.vr * 0.016;
+            if (q.x < -0.05) { q.x = 1.05; } else if (q.x > 1.05) { q.x = -0.05; }
+            if (q.y < -0.05) { q.y = 1.05; } else if (q.y > 1.05) { q.y = -0.05; }
+          }
+          const px = q.x * W - smx * 24 * q.z, py = q.y * H - smy * 24 * q.z;
+          tri(px, py, q.s, q.r);
+          if (q.f) { ctx.fillStyle = 'rgba(' + PAL[q.c] + ',0.28)'; ctx.fill(); }
+          ctx.strokeStyle = 'rgba(' + PAL[q.c] + ',0.55)'; ctx.stroke();
+        }
+
+        for (let i = 0; i < N; i++) {
+          const j = i * 3;
+          const k = k0 * spd[i];
+          pos[j] += (target[j] - pos[j]) * k;
+          pos[j + 1] += (target[j + 1] - pos[j + 1]) * k;
+          pos[j + 2] += (target[j + 2] - pos[j + 2]) * k;
+        }
+
+        ctx.globalCompositeOperation = 'lighter';
+        for (let c = 0; c < PAL.length; c++) {
+          ctx.fillStyle = 'rgb(' + PAL[c] + ')';
+          for (let i = 0; i < N; i++) {
+            if (col[i] !== c) { continue; }
+            const j = i * 3;
+            const wob = reduce ? 0 : Math.sin(t * 1.1 + i) * 0.012;
+            const x = pos[j] + wob, y = pos[j + 1] + wob, z = pos[j + 2];
+            const x1 = x * cy_ + z * sy_;
+            const z1 = -x * sy_ + z * cy_;
+            const y1 = y * cx_ - z1 * sx_;
+            const z2 = y * sx_ + z1 * cx_;
+            const pr = 3.4 / (3.4 + z2);
+            const sz = 0.8 + 1.7 * pr;
+            ctx.globalAlpha = Math.max(0.12, Math.min(0.95, 0.3 + (pr - 0.8) * 1.5));
+            ctx.fillRect(cx + x1 * scale * pr - sz / 2, cy + y1 * scale * pr - sz / 2, sz, sz);
+          }
+        }
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+      };
+      raf = requestAnimationFrame(frame);
+
+      return {
+        setShape: (i) => setShape(i, false),
+        destroy: () => {
+          alive = false;
+          cancelAnimationFrame(raf);
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('resize', resize);
+        }
+      };
+  }
+
   var state = {
     lang: ((navigator.language || 'tr').toLowerCase().indexOf('tr') === 0) ? 'tr' : 'en',
-    proj: 0, skill: 'esp32', job: 0
+    proj: 0, skill: 'esp32', job: 0, shape: 0
   };
+  var engine = null, shapeEls = [];
   var tabEls = [], jobEls = [], chipEls = [];
 
   function $(id) { return document.getElementById(id); }
@@ -185,16 +415,13 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-i18n-aria]'), function (n) {
       n.setAttribute('aria-label', u[n.getAttribute('data-i18n-aria')]);
     });
+    $('shapebar').setAttribute('aria-label', u.shapeAria);
     $('lang-tr').setAttribute('aria-pressed', String(state.lang === 'tr'));
     $('lang-en').setAttribute('aria-pressed', String(state.lang === 'en'));
 
     var nav = $('nav'); clear(nav);
     u.nav.forEach(function (n) {
       var a = h('a', 'navlink', n.label); a.href = n.href; nav.appendChild(a);
-    });
-    var cells = $('cells'); clear(cells);
-    u.cells.forEach(function (c) {
-      var d = h('div', 'cell'); d.appendChild(h('dt', null, c[0])); d.appendChild(h('dd', null, c[1])); cells.appendChild(d);
     });
   }
 
@@ -284,11 +511,35 @@
     badge.className = 'badge' + (cur.lvl === 'a' ? ' is-applied' : '');
   }
 
+
+  function buildShapes() {
+    var bar = $('shapebar');
+    shapeEls.forEach(function (b) { bar.removeChild(b); });
+    shapeEls = [];
+    ui().shapes.forEach(function (label, i) {
+      var b = h('button', 'shapebtn', label); b.type = 'button';
+      b.addEventListener('click', function () {
+        state.shape = i; updateShapes();
+        if (engine) { engine.setShape(i); }
+      });
+      bar.appendChild(b); shapeEls.push(b);
+    });
+    updateShapes();
+  }
+  function updateShapes() {
+    shapeEls.forEach(function (b, i) { b.setAttribute('aria-pressed', String(i === state.shape)); });
+  }
+
   function render() {
-    buildStatic(); buildTabs(); updateProject(); buildJobs(); updateJobs(); buildGroups(); updateSkill();
+    buildStatic(); buildShapes(); buildTabs(); updateProject(); buildJobs(); updateJobs(); buildGroups(); updateSkill();
   }
 
   $('lang-tr').addEventListener('click', function () { state.lang = 'tr'; render(); });
   $('lang-en').addEventListener('click', function () { state.lang = 'en'; render(); });
   render();
+
+  var canvas = $('hero-canvas');
+  if (canvas) {
+    engine = startEngine(canvas, state.shape, function (i) { state.shape = i; updateShapes(); });
+  }
 })();

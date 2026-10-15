@@ -5,100 +5,60 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hatice Zeynep Demir – Portfolyo</title>
 <meta name="description" content="Hatice Zeynep Demir – Mekatronik Mühendisliği öğrencisi. Projeler, deneyim ve beceriler.">
-<meta name="theme-color" content="#FFF6F5">
+<meta name="theme-color" content="#1A1316">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/portfolio/style.css">
 </head>
 <body>
+<div class="page">
 
-<header class="site-header">
-  <div class="wrap header-inner">
-    <span class="brand mono">HATİCE ZEYNEP DEMİR</span>
+<header class="site">
+  <div class="wrap site-in">
+    <span class="brand">Hatice Zeynep DEMİR</span>
     <nav class="nav" id="nav" aria-label="Sections"></nav>
-    <div class="langs" role="group" aria-label="Language / Dil">
-      <button type="button" class="lang" id="lang-tr" aria-pressed="true">TR</button>
-      <button type="button" class="lang" id="lang-en" aria-pressed="false">EN</button>
+    <div class="tools">
+      <div class="langs" role="group" aria-label="Language / Dil">
+        <button type="button" class="lang" id="lang-tr" aria-pressed="true">TR</button>
+        <button type="button" class="lang" id="lang-en" aria-pressed="false">EN</button>
+      </div>
+      <a class="pill pill-sm" href="#contact" data-i18n="navCta"></a>
     </div>
   </div>
 </header>
 
 <main>
 <section class="hero">
-  <div class="sheetgrid"></div>
-  <div class="wrap hero-inner">
+  <canvas class="hero-canvas" id="hero-canvas" aria-hidden="true"></canvas>
+  <div class="wrap hero-in">
     <div class="hero-text">
-      <span class="doclabel mono rv d1" data-i18n="docLabel"></span>
-      <h1 class="rv d2">Hatice Zeynep<br>Demir</h1>
-      <div class="role mono rv d2" data-i18n="role"></div>
+      <span class="eyebrow rv d1" data-i18n="role"></span>
+      <h1 class="h1 rv d2">Hatice<br>Zeynep<br>Demir.</h1>
       <p class="intro rv d3" data-i18n="intro"></p>
       <div class="cta rv d4">
-        <a class="btn btn-fill" href="mailto:hzeynepdemirr@gmail.com" data-i18n="emailBtn"></a>
-        <a class="btn btn-line" href="https://github.com/zeynepdemir1">GitHub</a>
+        <a class="pill" href="mailto:hzeynepdemirr@gmail.com" data-i18n="emailBtn"></a>
+        <a class="textlink" href="https://github.com/zeynepdemir1">GitHub →</a>
       </div>
     </div>
-
-    <figure class="sheet rv d3">
-      <div class="sheet-bar mono"><span data-i18n="figTitle"></span><span>A4 · 1:1</span></div>
-      <div class="sheet-body">
-        <svg viewBox="0 0 560 290" role="img" data-i18n-aria="figAlt">
-          <g class="ln">
-            <path d="M20 110H74"></path>
-            <circle cx="90" cy="110" r="16"></circle>
-            <path d="M106 110H170"></path>
-            <rect x="170" y="80" width="96" height="60"></rect>
-            <path d="M266 110H322"></path>
-            <rect x="322" y="80" width="96" height="60"></rect>
-            <path d="M418 110H540"></path>
-            <rect x="190" y="205" width="96" height="50"></rect>
-          </g>
-          <g class="fb flow">
-            <path d="M470 110V230H286"></path>
-            <path d="M190 230H90V126"></path>
-          </g>
-          <g class="ar">
-            <path d="M62 104L74 110L62 116Z"></path>
-            <path d="M158 104L170 110L158 116Z"></path>
-            <path d="M310 104L322 110L310 116Z"></path>
-            <path d="M528 104L540 110L528 116Z"></path>
-            <path d="M84 138L90 126L96 138Z"></path>
-            <path d="M298 224L286 230L298 236Z"></path>
-            <circle cx="470" cy="110" r="4"></circle>
-          </g>
-          <g class="tx">
-            <text x="22" y="96" class="tx-start">r(t)</text>
-            <text x="76" y="94">+</text>
-            <text x="104" y="132">−</text>
-            <text x="218" y="116">C(s)</text>
-            <text x="370" y="116">G(s)</text>
-            <text x="238" y="236">H(s)</text>
-            <text x="518" y="96">y(t)</text>
-          </g>
-          <g class="tx cap">
-            <text x="218" y="70">CONTROLLER</text>
-            <text x="370" y="70">PLANT</text>
-            <text x="238" y="274">SENSOR</text>
-          </g>
-        </svg>
-        <dl class="cells" id="cells"></dl>
-      </div>
-    </figure>
+    <div class="shapebar" id="shapebar" role="group">
+      <span class="shapelabel" data-i18n="shapeLabel"></span>
+    </div>
   </div>
 </section>
 
 <section id="projects" class="wrap section">
   <div class="sec-head">
-    <span class="sec-num mono">1.0</span>
+    <span class="sec-num">01</span>
     <h2 data-i18n="s1"></h2>
-    <span class="sec-hint mono" data-i18n="hint1"></span>
+    <span class="sec-hint" data-i18n="hint1"></span>
   </div>
   <div class="proj-layout">
-    <div class="tabs" id="tabs"></div>
+    <div class="tabs" id="tabs" role="group"></div>
     <article class="card">
       <div class="card-head">
         <h3 id="card-title"></h3>
-        <span class="card-id mono" id="card-id"></span>
+        <span class="card-id" id="card-id"></span>
       </div>
       <dl class="rows" id="card-rows"></dl>
       <div class="links" id="card-links"></div>
@@ -108,23 +68,23 @@
 
 <section id="experience" class="wrap section">
   <div class="sec-head">
-    <span class="sec-num mono">2.0</span>
+    <span class="sec-num">02</span>
     <h2 data-i18n="s2"></h2>
-    <span class="sec-hint mono" data-i18n="hint2"></span>
+    <span class="sec-hint" data-i18n="hint2"></span>
   </div>
   <div class="joblist" id="jobs"></div>
 </section>
 
 <section id="skills" class="wrap section">
   <div class="sec-head">
-    <span class="sec-num mono">3.0</span>
+    <span class="sec-num">03</span>
     <h2 data-i18n="s3"></h2>
-    <span class="sec-hint mono" data-i18n="hint3"></span>
+    <span class="sec-hint" data-i18n="hint3"></span>
   </div>
   <div class="skills-layout">
     <div class="groups" id="groups"></div>
     <aside class="spec" aria-live="polite">
-      <div class="spec-bar mono"><span data-i18n="specLabel"></span><span class="badge" id="spec-badge"></span></div>
+      <div class="spec-bar"><span data-i18n="specLabel"></span><span class="badge" id="spec-badge"></span></div>
       <div class="spec-body">
         <div class="spec-name" id="spec-name"></div>
         <p class="spec-text" id="spec-text"></p>
@@ -134,10 +94,10 @@
 </section>
 </main>
 
-<footer id="contact" class="site-footer">
-  <div class="wrap foot">
+<footer id="contact" class="foot">
+  <div class="wrap foot-in">
     <div class="foot-text">
-      <span class="foot-label mono" data-i18n="s4label"></span>
+      <span class="foot-label" data-i18n="s4label"></span>
       <h2 data-i18n="contactTitle"></h2>
       <p data-i18n="contactText"></p>
     </div>
@@ -151,7 +111,7 @@
 <noscript>
   <div class="wrap noscript">Hatice Zeynep Demir · Mekatronik Mühendisliği · hzeynepdemirr@gmail.com · github.com/zeynepdemir1</div>
 </noscript>
-
+</div>
 <script src="/portfolio/app.js"></script>
 </body>
 </html>
