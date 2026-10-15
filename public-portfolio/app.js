@@ -5,7 +5,7 @@
 
   var UI = {
     tr: {
-      title: 'Zeynep Demir – Portfolyo',
+      title: 'Hatice Zeynep Demir – Portfolyo',
       docLabel: 'PORTFOLYO · REV. 2026.10',
       role: 'Mekatronik Mühendisliği öğrencisi',
       intro: "Marmara Üniversitesi'nde mekatronik mühendisliği okuyorum. Gömülü sistemler, görüntü işleme ve yapay zekâ destekli yazılım üzerinde projeler geliştiriyorum; uzun vadeli ilgim sağlık teknolojileri ve biyomekatronik.",
@@ -24,14 +24,14 @@
         { label: 'Beceriler', href: '#skills' }, { label: 'İletişim', href: '#contact' }
       ],
       cells: [
-        ['ÖĞRENCİ', 'Zeynep Demir'], ['BÖLÜM', 'Mekatronik Müh.'], ['ÜNİVERSİTE', 'Marmara Üniv.'],
+        ['ÖĞRENCİ', 'Hatice Zeynep Demir'], ['BÖLÜM', 'Mekatronik Müh.'], ['ÜNİVERSİTE', 'Marmara Üniv.'],
         ['SINIF', '3. sınıf'], ['MEZUNİYET', '2028'], ['DİLLER', 'TR · EN (B1)']
       ],
       groups: ['GÖMÜLÜ SİSTEMLER', 'YAZILIM VE YAPAY ZEKÂ', 'MÜHENDİSLİK ARAÇLARI'],
       keys: ['PROBLEM', 'ÇÖZÜM', 'DURUM']
     },
     en: {
-      title: 'Zeynep Demir – Portfolio',
+      title: 'Hatice Zeynep Demir – Portfolio',
       docLabel: 'PORTFOLIO · REV. 2026.10',
       role: 'Mechatronics Engineering student',
       intro: 'I study mechatronics engineering at Marmara University. I build projects in embedded systems, computer vision and AI-assisted software, with a long-term interest in health technologies and biomechatronics.',
@@ -50,7 +50,7 @@
         { label: 'Skills', href: '#skills' }, { label: 'Contact', href: '#contact' }
       ],
       cells: [
-        ['STUDENT', 'Zeynep Demir'], ['DEPARTMENT', 'Mechatronics Eng.'], ['UNIVERSITY', 'Marmara Univ.'],
+        ['STUDENT', 'Hatice Zeynep Demir'], ['DEPARTMENT', 'Mechatronics Eng.'], ['UNIVERSITY', 'Marmara Univ.'],
         ['YEAR', 'Year 3'], ['GRADUATION', '2028'], ['LANGUAGES', 'TR · EN (B1)']
       ],
       groups: ['EMBEDDED SYSTEMS', 'SOFTWARE AND AI', 'ENGINEERING TOOLS'],
