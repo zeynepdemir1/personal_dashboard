@@ -381,6 +381,47 @@ app.use((_req, res, next) => {
   next();
 });
 
+// Herkese açık statik portfolyo (/portfolio/*) — Zeynep'in site genelindeki
+// parola korumasının TEK istisnası. Yukarıdaki güvenlik başlıkları
+// middleware'inden SONRA ama aşağıdaki oturum/parola kontrolünden ÖNCE
+// tanımlanıyor ki bu yollar hem X-Frame-Options vb. ile korunsun hem de
+// oturum çerezi aranmadan servis edilsin.
+//
+// Yol güvenliği — `express.static`'in kendi (yaygın kullanılan, test
+// edilmiş) `send` paketine bırakılıyor, elle bir path-traversal kontrolü
+// YAZILMADI çünkü gerçek istekle (curl --path-as-is, yani tarayıcı/istemci
+// tarafı normalizasyonu devre dışı) doğrulandı:
+//   - `app.use('/portfolio', ...)` mount'u segment sınırına saygılı —
+//     `/portfolioX`, `/portfolio.evil` gibi yollar BU middleware'e HİÇ
+//     girmiyor (Express'in kendi prefix eşleştirmesi).
+//   - `/portfolio/../api/state`, `/portfolio/%2e%2e/api/state`,
+//     `/portfolio/..%2fapi/state` gibi gerçek (ham, decode edilmemiş)
+//     traversal denemeleri mount'a GİRİYOR ama `express.static` hiçbir
+//     dosya sunmuyor (kök dizinin dışına çıkmaya izin vermiyor) ve
+//     `next()` çağırıyor — bu noktada Express `req.path`/`req.url`'i
+//     TAM ORİJİNAL haliyle (`/portfolio/../api/state` vb.) geri
+//     yüklüyor, yani aşağıdaki normal oturum kontrolüne düşüyor (o da
+//     bunu `/api/*` sanmıyor, giriş ekranını gösteriyor — asla 401
+//     korumalı bir API'ye ya da gerçek uygulama içeriğine sızmıyor).
+//   - `express.static` sadece GET/HEAD'i işliyor; POST gibi diğer
+//     metodlar da aynı şekilde `next()` ile aşağıya, normal oturum
+//     kontrolüne düşüyor.
+// `/api/*` bu mount'un tamamen dışında — hiçbir zaman buraya girmiyor.
+const PORTFOLIO_DIR = path.join(__dirname, 'public-portfolio');
+app.use(
+  '/portfolio',
+  express.static(PORTFOLIO_DIR, {
+    dotfiles: 'ignore',
+    index: 'index.html',
+    setHeaders: (res, filePath) => {
+      // HTML her zaman yeniden doğrulansın (içerik güncellenince eski
+      // sürüm önbellekte takılı kalmasın); CSS/JS gibi varlıklar kısa
+      // bir süre (5dk) önbelleklenebilir.
+      res.setHeader('Cache-Control', filePath.endsWith('.html') ? 'no-cache' : 'public, max-age=300');
+    },
+  }),
+);
+
 app.use((req, res, next) => {
   if (!AUTH_CONFIGURED) {
     next();
