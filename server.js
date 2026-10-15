@@ -207,6 +207,8 @@ document.getElementById('f').addEventListener('submit', async (e) => {
       location.reload();
     } else if (res.status === 429) {
       err.textContent = 'Çok fazla deneme yapıldı, biraz sonra tekrar dene.';
+    } else if (res.status === 503) {
+      err.textContent = 'Giriş şu an geçici olarak kullanılamıyor, biraz sonra tekrar dene.';
     } else {
       err.textContent = 'Yanlış parola.';
     }
@@ -240,36 +242,131 @@ if (forgotBtn) {
 </body>
 </html>`;
 
-// Basit brute-force yavaşlatması: aynı IP art arda çok denerse bir süre
-// kilitleniyor. Bellek içi (Render yeniden başlayınca sıfırlanır) — tam
-// bir çözüm değil ama tek satırlık bir bariyer bile otomatik parola
-// denemesini pratik olmaktan çıkarır.
-const loginAttempts = new Map(); // ip -> { count, lockedUntil }
+// Brute-force yavaşlatması: aynı IP art arda çok denerse bir süre
+// kilitleniyor. Upstash Redis'te tutuluyor (bkz. PLAN.md) — ESKİDEN
+// bellek içi bir Map'teydi, bu da hem Render yeniden başlayınca hem de
+// (asıl sorun) `req.ip` farklı istek farklı değerler çözerse hiç
+// birikmiyordu; canlıda gerçek testle doğrulandı (15 ardışık yanlış
+// denemede 401/429 karışık/rastgele geldi, düzenli bir kilit yoktu).
+// Redis TEK bir yerde tutulduğu için artık hem kalıcı hem (birden fazla
+// instance olsa bile) paylaşılan bir sayaç.
+//
+// GÜVENLİK — Zeynep'in açık tercihi: Redis'e ulaşılamazsa giriş TAMAMEN
+// REDDEDİLİR (fail-closed), asla "koruma devre dışı, yine de izin ver"
+// şeklinde AÇIK kalmaz — rate limiter'ın kendisi çalışmıyorsa parolayı
+// hiç kontrol etmemek, onu korumasız bırakmaktan daha güvenlidir.
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_MS = 60 * 1000;
 
-function checkAndRecordLoginAttempt(ip, success) {
-  const now = Date.now();
-  const rec = loginAttempts.get(ip) || { count: 0, lockedUntil: 0 };
-  if (rec.lockedUntil > now) return false;
+// Canlıda `trust proxy` ayarının gerçekten doğru IP'yi çözdüğünü
+// (Render loglarından) sonradan doğrulayabilmek için her giriş
+// denemesinde IP'nin SON İKİ SEKİZLİSİ MASKELENEREK loglanıyor (ör.
+// "203.0.xxx.xxx") — tam IP log dosyasına yazılmıyor, sadece hangi geniş
+// ağdan geldiği ve (en önemlisi) ART ARDA GELEN DENEMELERİN AYNI
+// MASKELENMİŞ DEĞERİ GÖSTERİP GÖSTERMEDİĞİ görülebiliyor.
+function maskIp(ip) {
+  if (!ip || typeof ip !== 'string') return 'unknown';
+  const v4 = ip.startsWith('::ffff:') ? ip.slice(7) : ip;
+  const v4Match = v4.match(/^(\d+)\.(\d+)\.\d+\.\d+$/);
+  if (v4Match) return `${v4Match[1]}.${v4Match[2]}.xxx.xxx`;
+  const groups = ip.split(':');
+  if (groups.length >= 3) return `${groups[0]}:${groups[1]}:xxxx…`;
+  return 'xxxx';
+}
+
+function loginFailKey(ip) {
+  return `loginrate:fail:${ip}`;
+}
+function loginLockKey(ip) {
+  return `loginrate:lock:${ip}`;
+}
+
+// true/false DEĞİL — Redis'e hiç ulaşılamazsa hata fırlatır (çağıran yer
+// bunu 503 ile fail-closed olarak ele alıyor).
+async function isLoginLocked(ip) {
+  const locked = await redis('GET', loginLockKey(ip));
+  return !!locked;
+}
+
+async function recordLoginAttempt(ip, success) {
   if (success) {
-    loginAttempts.delete(ip);
-    return true;
+    await redis('DEL', loginFailKey(ip), loginLockKey(ip));
+    return;
   }
-  rec.count += 1;
-  if (rec.count >= LOGIN_MAX_ATTEMPTS) {
-    rec.lockedUntil = now + LOGIN_LOCKOUT_MS;
-    rec.count = 0;
+  const count = await redis('INCR', loginFailKey(ip));
+  if (count === 1) {
+    // İlk başarısız denemeden LOGIN_LOCKOUT_MS sonra sayaç kendiliğinden
+    // sıfırlanır — eşiğe ulaşılamadıysa sonsuza kadar birikmesin diye.
+    await redis('PEXPIRE', loginFailKey(ip), LOGIN_LOCKOUT_MS);
   }
-  loginAttempts.set(ip, rec);
-  return true;
+  if (count >= LOGIN_MAX_ATTEMPTS) {
+    await redis('SET', loginLockKey(ip), '1', 'PX', LOGIN_LOCKOUT_MS);
+  }
 }
 
 const app = express();
-// Render (ve çoğu PaaS) bir ters proxy arkasında çalıştırıyor — bu
-// olmadan req.ip her zaman proxy'nin kendi adresini gösterir, IP başına
-// giriş denemesi sınırlaması (aşağıda) işe yaramaz hale gelir.
-app.set('trust proxy', 1);
+// Hangi framework'ün çalıştığını (Express) karşı tarafa söylemenin bir
+// faydası yok — bedava bir keşif/parmak izi sinyali, kapatıyoruz.
+app.disable('x-powered-by');
+
+// zdemir.tech Cloudflare → Render zinciri arkasında çalışıyor (gerçek
+// istekle doğrulandı: hem özel alan adı hem Render'ın kendi
+// *.onrender.com adresi AYNI Cloudflare katmanından geçiyor — bu,
+// Render'ın platform altyapısının bir parçası, Zeynep'in ayrıca eklediği
+// bir şey değil; yani bu uygulamaya Cloudflare'ı ATLAYARAK ulaşmanın bir
+// yolu yok). `trust proxy`'yi sabit bir hop sayısına (eski: `1`) göre
+// ayarlamak riskliydi — saldırgan X-Forwarded-For/CF-Connecting-IP
+// başlığını kendi uydurabilir, sunucu da bunu "tek güvenilir hop"
+// sanıp olduğu gibi kabul edebilirdi. Bunun yerine Cloudflare'ın resmi,
+// yayınlanmış IP aralıklarını (https://www.cloudflare.com/ips/)
+// kullanıyoruz: Express/`proxy-addr` (bkz. aşağıdaki not), X-Forwarded-For
+// zincirini SADECE bağlanan taraf GERÇEKTEN bu aralıklardan biriyse
+// güvenilir sayıyor. Böylece bir saldırganın uydurduğu IP, ancak o
+// bağlantı gerçekten Cloudflare üzerinden geliyorsa işe yarayabilir — ki
+// o durumda zaten Cloudflare kendi gözlemlediği GERÇEK istemci IP'sini
+// (saldırganın bilgisayarının asıl adresini) header'a yazıyor, saldırganın
+// uydurduğu değeri değil. Bağlanan taraf bu listede değilse (ör. ileride
+// altyapı değişirse) `req.ip` ham soket adresine düşer — bu durumda rate
+// limiter tüm istekleri aynı adresmiş gibi görür (yanlış ama GÜVENLİ bir
+// başarısızlık biçimi: sahtecilikle atlatılamaz, sadece gereğinden
+// kısıtlayıcı olur).
+//
+// NOT: `proxy-addr` paketinde (Express'in trust-proxy/IP hesaplamasını
+// yapan bağımlılığı) tam da bu CIDR/subnet güven kontrolünü etkileyen
+// kritik bir güvenlik açığı vardı (GHSA-jqcg-44mw-7w3h) — `npm audit fix`
+// ile 2.0.7'den 2.0.8'e yamalandı (bkz. PLAN.md). Bu liste o yama
+// OLMADAN güvenilir şekilde çalışmazdı.
+const CLOUDFLARE_IP_RANGES = [
+  '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
+  '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
+  '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+  '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+  '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32',
+  '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32',
+];
+// Render, çoğu çok kiracılı PaaS gibi muhtemelen Cloudflare'ın edge'i ile
+// konteynerin arasına KENDİ iç yönlendirme/yük dengeleme katmanını
+// koyuyor (Cloudflare'ın hangi müşteriye ait konteynere gideceğine karar
+// vermesi gerekiyor) — bu, bağlanan soketin Cloudflare'ın KENDİSİ değil,
+// Render'ın özel/iç ağ adresi olacağı anlamına gelir. Bunu Render'ın
+// belgelerinden/kodundan KESİN olarak doğrulayamadım (tahmin, kesin bilgi
+// değil) — bu yüzden ihtiyatlı davranıp 'loopback'/'linklocal'/
+// 'uniquelocal' (tüm standart özel/iç IP aralıkları, RFC1918 dahil) de
+// güven listesine ekleniyor. Bunu güvenli kılan şey: bu aralıklar internet
+// üzerinde YÖNLENDİRİLEMEZ — bir saldırgan TCP bağlantısının kaynak
+// adresini "10.x.x.x" gibi gösteremez (TCP'nin üç yönlü el sıkışması
+// bunu gerektirir, UDP'deki gibi basit paket sahteciliği işe yaramaz) —
+// yani bu adresler SADECE Render'ın kendi iç altyapısından gelebilir,
+// dışarıdan asla. Zincir şimdi şöyle çözülüyor: ham soket adresi (Render
+// iç ağı ya da doğrudan Cloudflare, hangisiyse) güvenilirse bir sonraki
+// X-Forwarded-For girdisine bakılır; o da Cloudflare aralığındaysa
+// (Cloudflare kendi iç hop'unu eklediyse) ona da bakılır; ilk GÜVENİLMEYEN
+// (yani ne özel ne Cloudflare olan) adres bulunduğunda orada durulur — bu
+// da saldırganın başlığa eklediği sahte adresleri atlayıp gerçek istemci
+// IP'sine ulaşır. Render'ın gerçek iç mimarisi bu varsayımdan farklıysa
+// (ör. hiç iç hop yoksa) bu liste fazladan ama ZARARSIZ bir güvenlik payı
+// olur; eksik olsaydı zarar verebilirdi.
+app.set('trust proxy', [...CLOUDFLARE_IP_RANGES, 'loopback', 'linklocal', 'uniquelocal']);
 
 // Basit güvenlik başlıkları (clickjacking/MIME sniffing) — helmet gibi
 // bir bağımlılık eklemeye gerek yok, tek satırlık bir middleware yeterli.
@@ -311,15 +408,27 @@ app.post('/api/login', express.json(), async (req, res) => {
     return;
   }
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
-  const rec = loginAttempts.get(ip);
-  if (rec && rec.lockedUntil > Date.now()) {
-    res.status(429).json({ error: 'too many attempts' });
+  console.info(`[server] Giriş denemesi — ip=${maskIp(ip)}`);
+  try {
+    if (await isLoginLocked(ip)) {
+      res.status(429).json({ error: 'too many attempts' });
+      return;
+    }
+  } catch (err) {
+    console.error('[server] Rate-limit durumu okunamadı (Redis erişilemedi) — giriş fail-closed reddediliyor:', err);
+    res.status(503).json({ error: 'rate limit unavailable' });
     return;
   }
   const password = req.body?.password;
   const activePassword = await getActivePassword();
   const ok = typeof password === 'string' && timingSafeStringEqual(password, activePassword);
-  checkAndRecordLoginAttempt(ip, ok);
+  try {
+    await recordLoginAttempt(ip, ok);
+  } catch (err) {
+    console.error('[server] Giriş denemesi kaydedilemedi (Redis erişilemedi) — giriş fail-closed reddediliyor:', err);
+    res.status(503).json({ error: 'rate limit unavailable' });
+    return;
+  }
   if (!ok) {
     res.status(401).json({ error: 'wrong password' });
     return;
